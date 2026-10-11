@@ -1,0 +1,56 @@
+# OmniScope OSINT - Git Ignore Rules
+# Security & Privacy First: Never commit secrets, vaults, or bloated binaries
+
+# Environment & Secrets
+.env
+*.env
+.env.*
+!.env.example
+backend/data/api_keys.json
+backend/data/tomorrow_quota.json
+
+# SQLite Databases & WAL files
+*.db
+*.db-wal
+*.db-shm
+backend/data/vault.db
+backend/data/omniscope_spatial.db
+backend/data/nexus_spatial.db
+backend/data/cameras.db
+backend/data/audit_log.db
+
+# Large Datasets (>50MB) - Built dynamically via setup_wizard.py
+backend/data/cameras_db.json
+backend/data/weather_stations.json
+backend/data/genuine_streaming_cameras.json
+
+# Python & Virtual Environments
+.venv/
+venv/
+env/
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+
+# Server process & runtime
+server.pid
+*.log
+logs/
+feedback_logs.json
+
+# Caches & temporary downloads
+backend/data/.cache/
+backend/data/.recon_cache/
+backend/data/captures/
+backend/data/downloads/
+screenshots/
+*.bak
+
+# IDE & OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

@@ -1,0 +1,1463 @@
+[
+  {
+    "name": "get_live_weather",
+    "description": "Query current weather observation for any city, country or coordinates (temp, dewpoint, wind, pressure).",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "location": {
+          "type": "string",
+          "description": "City or place name, e.g. 'Miami', 'Berlin', 'Tokyo'"
+        },
+        "lat": {
+          "type": "number",
+          "description": "Latitude coordinate"
+        },
+        "lon": {
+          "type": "number",
+          "description": "Longitude coordinate"
+        },
+        "provider": {
+          "type": "string",
+          "description": "Optional weather provider filter"
+        }
+      }
+    }
+  },
+  {
+    "name": "get_noaa_usa_feed",
+    "description": "Get official NOAA nationwide live observation feed covering all 50 US states with extreme summaries.",
+    "parameters": {
+      "type": "object",
+      "properties": {}
+    }
+  },
+  {
+    "name": "get_noaa_station_observation",
+    "description": "Fetch specific NOAA ASOS/AWOS station live observation (e.g. KJFK, KOKC, KDEN, KORD) with METAR metrics.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "station_id": {
+          "type": "string",
+          "description": "4-letter ICAO station ID (e.g. 'KOKC', 'KJFK')"
+        }
+      },
+      "required": [
+        "station_id"
+      ]
+    }
+  },
+  {
+    "name": "get_nexrad_radar_meta",
+    "description": "Get live NOAA NEXRAD Level-III composite Doppler radar tile specifications, bounds, and reflectivity legend.",
+    "parameters": {
+      "type": "object",
+      "properties": {}
+    }
+  },
+  {
+    "name": "query_historical_weather",
+    "description": "Query Open-Meteo & NOAA global historical weather archive from 1940 to present by city/coords and date.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "location": {
+          "type": "string",
+          "description": "City or location name, e.g. 'Joplin', 'Hamburg'"
+        },
+        "date": {
+          "type": "string",
+          "description": "Target date in YYYY-MM-DD format (e.g. '2011-05-22')"
+        },
+        "lat": {
+          "type": "number",
+          "description": "Optional latitude coordinate"
+        },
+        "lon": {
+          "type": "number",
+          "description": "Optional longitude coordinate"
+        }
+      },
+      "required": [
+        "date"
+      ]
+    }
+  },
+  {
+    "name": "query_tornado_archive",
+    "description": "Search NOAA Local Storm Reports (LSR) archive for confirmed tornadoes, wind gusts and hail by date or preset.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "date": {
+          "type": "string",
+          "description": "Date in YYYY-MM-DD format (e.g. '2013-05-20')"
+        },
+        "state": {
+          "type": "string",
+          "description": "2-letter US State abbreviation (e.g. 'OK', 'MO', 'AL')"
+        },
+        "preset": {
+          "type": "string",
+          "description": "Preset name (e.g. 'moore_ef5_2013', 'joplin_ef5_2011', 'super_outbreak_2011')"
+        }
+      }
+    }
+  },
+  {
+    "name": "get_weather_alerts",
+    "description": "Fetch active severe weather warnings and watches (tornado, severe thunderstorm, flash flood) from NOAA.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "severity": {
+          "type": "string",
+          "description": "Minimum severity filter: 'Extreme', 'Severe', 'Moderate'"
+        },
+        "event_type": {
+          "type": "string",
+          "description": "Filter by event name: 'Tornado Warning', 'Severe Thunderstorm Warning'"
+        }
+      }
+    }
+  },
+  {
+    "name": "get_severe_weather_metrics",
+    "description": "Analyze convective atmospheric storm parameters (CAPE, Lifted Index, Helicity, Wind Shear) for coordinates.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "lat": {
+          "type": "number",
+          "description": "Latitude coordinate"
+        },
+        "lon": {
+          "type": "number",
+          "description": "Longitude coordinate"
+        }
+      },
+      "required": [
+        "lat",
+        "lon"
+      ]
+    }
+  },
+  {
+    "name": "get_space_weather",
+    "description": "Retrieve solar flux, geomagnetic Kp-index, solar flare classifications, and auroral oval boundary data.",
+    "parameters": {
+      "type": "object",
+      "properties": {}
+    }
+  },
+  {
+    "name": "get_air_quality_telemetry",
+    "description": "Query WAQI / OpenAQ air quality index (PM2.5, PM10, O3, NO2, SO2, CO) for any city or coordinate.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "city": {
+          "type": "string",
+          "description": "City name"
+        },
+        "lat": {
+          "type": "number",
+          "description": "Latitude"
+        },
+        "lon": {
+          "type": "number",
+          "description": "Longitude"
+        }
+      }
+    }
+  },
+  {
+    "name": "get_alarm_status",
+    "description": "Retrieve current tactical severe weather alarm status, active triggers, and threat level.",
+    "parameters": {
+      "type": "object",
+      "properties": {}
+    }
+  },
+  {
+    "name": "configure_weather_alarm",
+    "description": "Configure severe weather alert triggers (tornado, supercell, hook echo, EF-scale, wind gust, hail, siren sound).",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "twister_tornado": {
+          "type": "boolean",
+          "description": "Trigger on tornado warning or funnel on ground"
+        },
+        "supercell": {
+          "type": "boolean",
+          "description": "Trigger on rotating supercell mesocyclone"
+        },
+        "hook_echo": {
+          "type": "boolean",
+          "description": "Trigger on radar hook echo vortex"
+        },
+        "min_ef_scale": {
+          "type": "integer",
+          "description": "Minimum EF-scale rating (0 to 5)"
+        },
+        "min_wind_gust_mph": {
+          "type": "number",
+          "description": "Minimum wind gust threshold in mph (e.g. 58.0)"
+        },
+        "min_hail_size_inches": {
+          "type": "number",
+          "description": "Minimum hail size threshold in inches (e.g. 1.0)"
+        },
+        "sound_siren": {
+          "type": "boolean",
+          "description": "Enable EAS audio siren playback"
+        },
+        "desktop_notification": {
+          "type": "boolean",
+          "description": "Enable Windows desktop toast notifications"
+        },
+        "auto_jump_to_feed": {
+          "type": "boolean",
+          "description": "Auto-switch to nearest camera feed on twister alarm"
+        },
+        "polling_interval_sec": {
+          "type": "integer",
+          "description": "Live polling refresh interval in seconds (30 to 1200)"
+        }
+      }
+    }
+  },
+  {
+    "name": "test_weather_alarm",
+    "description": "Trigger an emergency drill test alarm for confirmed EF-4/EF-5 twister touchdown with siren and nearest feed.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "sector": {
+          "type": "string",
+          "description": "Sector label (e.g. 'Moore, OK', 'Joplin, MO', 'Wichita, KS')"
+        }
+      }
+    }
+  },
+  {
+    "name": "get_tornadoes_on_ground",
+    "description": "List all confirmed tornadoes currently on the ground with coordinates, touchdown sectors, and nearest feeds.",
+    "parameters": {
+      "type": "object",
+      "properties": {}
+    }
+  },
+  {
+    "name": "jump_to_severe_storm_feed",
+    "description": "Locate and return the nearest live camera and Doppler radar sector for an active storm or tornado sector.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "lat": {
+          "type": "number",
+          "description": "Touchdown latitude coordinate"
+        },
+        "lon": {
+          "type": "number",
+          "description": "Touchdown longitude coordinate"
+        },
+        "event_title": {
+          "type": "string",
+          "description": "Optional storm event label"
+        }
+      },
+      "required": [
+        "lat",
+        "lon"
+      ]
+    }
+  },
+  {
+    "name": "set_polling_interval",
+    "description": "Configure the live weather & severe storm polling interval in seconds (from 30s to 1200s / 20 min).",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "interval_seconds": {
+          "type": "integer",
+          "description": "Interval in seconds (60 to 1200)"
+        }
+      },
+      "required": [
+        "interval_seconds"
+      ]
+    }
+  },
+  {
+    "name": "get_camera_by_id",
+    "description": "Fetch full details and live feeds for a camera ID (coordinates, provider, stream URL, resolution).",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "camera_id": {
+          "type": "string",
+          "description": "Unique camera identifier (e.g. 'px_zugspitze', 'tfl_00001')"
+        }
+      },
+      "required": [
+        "camera_id"
+      ]
+    }
+  },
+  {
+    "name": "search_cameras",
+    "description": "Search real webcams by query, city, country, provider, or category with pagination.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string",
+          "description": "Search keyword (e.g. 'bridge', 'alps', 'interstate')"
+        },
+        "country": {
+          "type": "string",
+          "description": "Country name (e.g. 'Germany', 'USA', 'Austria')"
+        },
+        "provider": {
+          "type": "string",
+          "description": "Provider name (e.g. 'TfL_London', 'WSDOT', 'Panomax')"
+        },
+        "limit": {
+          "type": "integer",
+          "description": "Results limit (default 20)"
+        },
+        "page": {
+          "type": "integer",
+          "description": "Page number (default 1)"
+        }
+      }
+    }
+  },
+  {
+    "name": "get_cameras_in_bbox",
+    "description": "Spatial bounding box query for all real optical webcams strictly within min/max lat/lon bounds.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "min_lat": {
+          "type": "number",
+          "description": "Minimum latitude"
+        },
+        "max_lat": {
+          "type": "number",
+          "description": "Maximum latitude"
+        },
+        "min_lon": {
+          "type": "number",
+          "description": "Minimum longitude"
+        },
+        "max_lon": {
+          "type": "number",
+          "description": "Maximum longitude"
+        },
+        "limit": {
+          "type": "integer",
+          "description": "Maximum cameras to return (default 50)"
+        }
+      },
+      "required": [
+        "min_lat",
+        "max_lat",
+        "min_lon",
+        "max_lon"
+      ]
+    }
+  },
+  {
+    "name": "find_nearest_camera",
+    "description": "Find the closest N real cameras to any GPS coordinate, returning distance in km and compass bearing.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "lat": {
+          "type": "number",
+          "description": "Latitude coordinate"
+        },
+        "lon": {
+          "type": "number",
+          "description": "Longitude coordinate"
+        },
+        "limit": {
+          "type": "integer",
+          "description": "Number of closest cameras to find (default 5)"
+        }
+      },
+      "required": [
+        "lat",
+        "lon"
+      ]
+    }
+  },
+  {
+    "name": "get_camera_snapshot",
+    "description": "Retrieve the latest or historical image snapshot URL for a webcam, with optional date/time filter.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "camera_id": {
+          "type": "string",
+          "description": "Camera ID"
+        },
+        "date": {
+          "type": "string",
+          "description": "Optional ISO date (YYYY-MM-DD)"
+        },
+        "time_str": {
+          "type": "string",
+          "description": "Optional time (HH:MM)"
+        }
+      },
+      "required": [
+        "camera_id"
+      ]
+    }
+  },
+  {
+    "name": "list_camera_timelines",
+    "description": "List available historical archives and timelapses (e.g. day, lifetime, 5fps timelapse) for a camera.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "camera_id": {
+          "type": "string",
+          "description": "Camera ID"
+        }
+      },
+      "required": [
+        "camera_id"
+      ]
+    }
+  },
+  {
+    "name": "filter_cameras_by_weather",
+    "description": "Find cameras located inside areas with specific live weather conditions (rain, snow, fog, clear).",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "condition": {
+          "type": "string",
+          "description": "Weather condition: 'rain', 'snow', 'fog', 'wind', 'clear'"
+        },
+        "country": {
+          "type": "string",
+          "description": "Optional country filter"
+        },
+        "limit": {
+          "type": "integer",
+          "description": "Limit of returned cameras (default 20)"
+        }
+      },
+      "required": [
+        "condition"
+      ]
+    }
+  },
+  {
+    "name": "get_traffic_camera_feeds",
+    "description": "Retrieve real highway and DOT traffic cameras (TfL, Autobahn GmbH, ASFINAG, WSDOT, Caltrans, etc.).",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "agency": {
+          "type": "string",
+          "description": "Agency name: 'AutobahnGmbH', 'TfL_London', 'WSDOT', 'CaltransCCTV'"
+        },
+        "limit": {
+          "type": "integer",
+          "description": "Limit (default 20)"
+        }
+      }
+    }
+  },
+  {
+    "name": "get_alpine_panorama_cams",
+    "description": "Query Panomax, Roundshot, and FotoWebcam 360\u00b0 high-altitude mountain panoramas across the Alps.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "provider": {
+          "type": "string",
+          "description": "'Panomax', 'Roundshot', or 'FotoWebcam'"
+        },
+        "limit": {
+          "type": "integer",
+          "description": "Limit (default 20)"
+        }
+      }
+    }
+  },
+  {
+    "name": "verify_camera_stream",
+    "description": "Test and check stream health, status code, latency and accessibility of a camera URL.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "camera_id": {
+          "type": "string",
+          "description": "Optional camera ID"
+        },
+        "stream_url": {
+          "type": "string",
+          "description": "Optional direct URL to verify"
+        }
+      }
+    }
+  },
+  {
+    "name": "run_jev_prediction",
+    "description": "Execute Jev AI neural network / heuristic engine for severe weather classification on input coordinates.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "lat": {
+          "type": "number",
+          "description": "Latitude"
+        },
+        "lon": {
+          "type": "number",
+          "description": "Longitude"
+        },
+        "north": {
+          "type": "number",
+          "description": "Bounding box north"
+        },
+        "south": {
+          "type": "number",
+          "description": "Bounding box south"
+        },
+        "east": {
+          "type": "number",
+          "description": "Bounding box east"
+        },
+        "west": {
+          "type": "number",
+          "description": "Bounding box west"
+        },
+        "date": {
+          "type": "string",
+          "description": "Target prediction date (YYYY-MM-DD)"
+        },
+        "engine": {
+          "type": "string",
+          "description": "'cloud' or 'local'"
+        }
+      }
+    }
+  },
+  {
+    "name": "get_jev_logits",
+    "description": "Retrieve raw model output logits, softmax probabilities, and confidence vectors from Jev AI.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "lat": {
+          "type": "number",
+          "description": "Latitude"
+        },
+        "lon": {
+          "type": "number",
+          "description": "Longitude"
+        }
+      }
+    }
+  },
+  {
+    "name": "analyze_radar_hook_echo",
+    "description": "Run Jev AI computer vision analysis on NEXRAD radar tiles to detect supercell hook echoes and rotation.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "lat": {
+          "type": "number",
+          "description": "Latitude"
+        },
+        "lon": {
+          "type": "number",
+          "description": "Longitude"
+        },
+        "zoom": {
+          "type": "integer",
+          "description": "Radar tile zoom level (default 7)"
+        }
+      },
+      "required": [
+        "lat",
+        "lon"
+      ]
+    }
+  },
+  {
+    "name": "get_openjev_status",
+    "description": "Inspect OpenJev model checkpoint, inference engine status (ONNX/DirectML/PyTorch/heuristic) and latency.",
+    "parameters": {
+      "type": "object",
+      "properties": {}
+    }
+  },
+  {
+    "name": "set_jev_visual_mode",
+    "description": "Toggle and configure the Jev AI visual map mode (threat zones, radar overlays, storm cells).",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Enable visual mode"
+        },
+        "mode": {
+          "type": "string",
+          "description": "'threat_zones', 'hook_echo', 'heat_map'"
+        },
+        "opacity": {
+          "type": "number",
+          "description": "Overlay opacity (0.0 to 1.0)"
+        }
+      }
+    }
+  },
+  {
+    "name": "query_jev_threat_matrix",
+    "description": "Get multi-category threat matrix (Tornado, Hail, Damaging Wind, Lightning, Flash Flood) for coordinates.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "lat": {
+          "type": "number",
+          "description": "Latitude"
+        },
+        "lon": {
+          "type": "number",
+          "description": "Longitude"
+        }
+      },
+      "required": [
+        "lat",
+        "lon"
+      ]
+    }
+  },
+  {
+    "name": "export_jev_forecast",
+    "description": "Generate and export structured JSON/GeoJSON forecast data for external systems.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "lat": {
+          "type": "number",
+          "description": "Latitude"
+        },
+        "lon": {
+          "type": "number",
+          "description": "Longitude"
+        },
+        "format": {
+          "type": "string",
+          "description": "'json' or 'geojson'"
+        }
+      },
+      "required": [
+        "lat",
+        "lon"
+      ]
+    }
+  },
+  {
+    "name": "benchmark_jev_engine",
+    "description": "Benchmark Jev inference throughput, execution time, and memory usage.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "iterations": {
+          "type": "integer",
+          "description": "Number of test iterations (default 5)"
+        }
+      }
+    }
+  },
+  {
+    "name": "get_global_metrics",
+    "description": "Retrieve total verified node counts, real camera counts, weather station counts, and active feeds.",
+    "parameters": {
+      "type": "object",
+      "properties": {}
+    }
+  },
+  {
+    "name": "list_providers",
+    "description": "List all registered genuine providers (NOAA, TfL, Autobahn GmbH, OpenCam, Windy, etc.) with verified counts.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "category": {
+          "type": "string",
+          "description": "Optional category filter"
+        }
+      }
+    }
+  },
+  {
+    "name": "get_flight_telemetry",
+    "description": "Query live airborne commercial and civil aircraft positions and transponder telemetry via OpenSky Network.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "bbox": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "description": "[min_lat, min_lon, max_lat, max_lon]"
+        },
+        "callsign": {
+          "type": "string",
+          "description": "Optional aircraft callsign filter"
+        },
+        "limit": {
+          "type": "integer",
+          "description": "Max aircraft to return (default 50)"
+        }
+      }
+    }
+  },
+  {
+    "name": "get_marine_vessels",
+    "description": "Query live maritime vessel positions, AIS signals, speed and heading via AISStream.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "bbox": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "description": "[min_lat, min_lon, max_lat, max_lon]"
+        },
+        "limit": {
+          "type": "integer",
+          "description": "Max vessels to return (default 50)"
+        }
+      }
+    }
+  },
+  {
+    "name": "get_usgs_earthquakes",
+    "description": "Retrieve live global earthquake seismic tremor events from USGS (magnitude, depth, epicenter).",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "min_magnitude": {
+          "type": "number",
+          "description": "Minimum earthquake magnitude (e.g. 2.5, 4.5)"
+        },
+        "limit": {
+          "type": "integer",
+          "description": "Max quakes to return (default 50)"
+        }
+      }
+    }
+  },
+  {
+    "name": "get_firms_wildfires",
+    "description": "Retrieve active satellite wildfire thermal anomalies from NASA FIRMS (MODIS/VIIRS).",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "country": {
+          "type": "string",
+          "description": "Country code or name"
+        },
+        "limit": {
+          "type": "integer",
+          "description": "Max fire points to return (default 50)"
+        }
+      }
+    }
+  },
+  {
+    "name": "get_transit_status",
+    "description": "Query live municipal transit, rail, highway and bus telemetry for supported metropolitan networks.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "provider_id": {
+          "type": "string",
+          "description": "Transit provider ID (e.g. 'tfl_london', 'sbb_switzerland')"
+        },
+        "mode": {
+          "type": "string",
+          "description": "'rail', 'bus', 'flight', 'highway'"
+        }
+      }
+    }
+  },
+  {
+    "name": "spatial_cluster_summary",
+    "description": "Get hierarchical cluster density counts across continents or countries.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "continent": {
+          "type": "string",
+          "description": "Continent name"
+        }
+      }
+    }
+  },
+  {
+    "name": "set_board_viewport",
+    "description": "Pan and zoom the OSINT board interactive map to specific coordinates and zoom level.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "lat": {
+          "type": "number",
+          "description": "Center latitude"
+        },
+        "lon": {
+          "type": "number",
+          "description": "Center longitude"
+        },
+        "zoom": {
+          "type": "integer",
+          "description": "Zoom level (1 to 18)"
+        }
+      },
+      "required": [
+        "lat",
+        "lon",
+        "zoom"
+      ]
+    }
+  },
+  {
+    "name": "toggle_map_layer",
+    "description": "Turn map layers on or off (radar, noaa_radar, cams, weather_stations, quakes, flights, vessels, fires).",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "layer_id": {
+          "type": "string",
+          "description": "Layer key name (e.g. 'radar', 'noaa_radar', 'cams', 'alerts')"
+        },
+        "enabled": {
+          "type": "boolean",
+          "description": "True to enable, False to disable"
+        }
+      },
+      "required": [
+        "layer_id",
+        "enabled"
+      ]
+    }
+  },
+  {
+    "name": "get_board_state",
+    "description": "Retrieve current board state (active monitors, viewport bounds, active layers, storm logs).",
+    "parameters": {
+      "type": "object",
+      "properties": {}
+    }
+  },
+  {
+    "name": "set_monitor_feed",
+    "description": "Assign a live camera stream or data feed to a specific dashboard monitor (MON-01, MON-02, MON-03, MON-04).",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "monitor_id": {
+          "type": "string",
+          "description": "'MON-01', 'MON-02', 'MON-03', or 'MON-04'"
+        },
+        "camera_id": {
+          "type": "string",
+          "description": "Optional camera ID"
+        },
+        "stream_url": {
+          "type": "string",
+          "description": "Optional direct stream URL"
+        },
+        "title": {
+          "type": "string",
+          "description": "Feed title"
+        }
+      },
+      "required": [
+        "monitor_id"
+      ]
+    }
+  },
+  {
+    "name": "read_osint_data",
+    "description": "Read structured records or JSON data from the OSINT database/data directory with filtering.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "collection": {
+          "type": "string",
+          "description": "Collection name (e.g. 'storm_logs', 'targets', 'bookmarks')"
+        },
+        "query": {
+          "type": "string",
+          "description": "Optional filter keyword"
+        }
+      },
+      "required": [
+        "collection"
+      ]
+    }
+  },
+  {
+    "name": "write_osint_data",
+    "description": "Save or update an OSINT investigation report, bookmark, or telemetry annotation into storage.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "collection": {
+          "type": "string",
+          "description": "Collection name"
+        },
+        "record_id": {
+          "type": "string",
+          "description": "Unique record identifier"
+        },
+        "data": {
+          "type": "object",
+          "description": "Arbitrary payload JSON object"
+        }
+      },
+      "required": [
+        "collection",
+        "record_id",
+        "data"
+      ]
+    }
+  },
+  {
+    "name": "create_storm_log",
+    "description": "Write an entry to the tactical severe storm logbook with timestamp, storm classification, coordinates, and notes.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "storm_type": {
+          "type": "string",
+          "description": "'TORNADO', 'SUPERCELL', 'DERECHO', 'MICROBURST'"
+        },
+        "severity": {
+          "type": "string",
+          "description": "'EF1', 'EF2', 'EF3', 'EF4', 'EF5', 'SEVERE'"
+        },
+        "lat": {
+          "type": "number",
+          "description": "Latitude"
+        },
+        "lon": {
+          "type": "number",
+          "description": "Longitude"
+        },
+        "notes": {
+          "type": "string",
+          "description": "Field notes or damage observations"
+        }
+      },
+      "required": [
+        "storm_type",
+        "severity",
+        "lat",
+        "lon"
+      ]
+    }
+  },
+  {
+    "name": "export_board_snapshot",
+    "description": "Export current board intelligence briefing summary as structured JSON.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "include_weather": {
+          "type": "boolean",
+          "description": "Include live weather observations"
+        },
+        "include_cameras": {
+          "type": "boolean",
+          "description": "Include active monitor camera states"
+        },
+        "include_alarms": {
+          "type": "boolean",
+          "description": "Include active alarm triggers"
+        }
+      }
+    }
+  },
+  {
+    "name": "get_feedback_logs",
+    "description": "Retrieve diagnostic feedback logs (node scans, spatial latencies, coordinate anomalies, and UI events) from feedback_logs.json.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "limit": {
+          "type": "integer",
+          "description": "Maximum number of log entries to retrieve (default: 50)"
+        },
+        "event_type": {
+          "type": "string",
+          "description": "Filter by event type, e.g. 'NODE_SCAN', 'COORDINATE_ANOMALY', 'CLIENT_LAYOUT_RESET', or 'all'"
+        }
+      }
+    }
+  },
+  {
+    "name": "write_feedback_log",
+    "description": "Append a client or agent diagnostic feedback note/event into feedback_logs.json on D: drive.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "event_name": {
+          "type": "string",
+          "description": "Event name, e.g. 'AGENT_INSPECTION', 'LAYOUT_OVERRIDE', 'ALERT_VERIFICATION'"
+        },
+        "payload": {
+          "type": "object",
+          "description": "Arbitrary diagnostic payload dictionary"
+        }
+      },
+      "required": [
+        "event_name",
+        "payload"
+      ]
+    }
+  },
+  {
+    "name": "clear_feedback_logs",
+    "description": "Clear all diagnostic feedback logs from memory and truncate feedback_logs.json on D: drive.",
+    "parameters": {
+      "type": "object",
+      "properties": {}
+    }
+  },
+  {
+    "name": "get_monitors_layout",
+    "description": "Get current screen layout and width proportions for MON-01 (Tactical Map), LIVE STORM INTERCEPT, and MON-02 (Omni View Cam Monitor).",
+    "parameters": {
+      "type": "object",
+      "properties": {}
+    }
+  },
+  {
+    "name": "reset_monitors_layout",
+    "description": "Reset monitor proportions to default balanced layout (46% MON-01 Map, 22% Storm Panel, 32% MON-02 Webcams) and un-collapse storm panel.",
+    "parameters": {
+      "type": "object",
+      "properties": {}
+    }
+  },
+  {
+    "name": "set_monitors_layout",
+    "description": "Set specific percentage widths and collapse states for MON-01, Storm Panel, and MON-02 with automatic clamp validation.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "map_pct": {
+          "type": "number",
+          "description": "Width fraction for MON-01 Map (e.g. 0.46)"
+        },
+        "storm_pct": {
+          "type": "number",
+          "description": "Width fraction for Storm Panel (e.g. 0.22)"
+        },
+        "storm_collapsed": {
+          "type": "boolean",
+          "description": "True to collapse Storm Panel"
+        }
+      },
+      "required": [
+        "map_pct"
+      ]
+    }
+  },
+  {
+    "name": "toggle_storm_panel",
+    "description": "Toggle or explicitly collapse/expand the LIVE STORM & TORNADO INTERCEPT panel between MON-01 and MON-02.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "collapsed": {
+          "type": "boolean",
+          "description": "Optional explicit collapsed state. If omitted, toggles current state."
+        }
+      }
+    }
+  },
+  {
+    "name": "set_radar_provider",
+    "description": "Switch Doppler radar provider network ('rainviewer', 'nexrad', 'dwd', 'owm_rain', 'owm_wind', 'satellite').",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "provider": {
+          "type": "string",
+          "enum": [
+            "rainviewer",
+            "nexrad",
+            "dwd",
+            "owm_rain",
+            "owm_wind",
+            "satellite"
+          ],
+          "description": "Selected radar network provider"
+        }
+      },
+      "required": [
+        "provider"
+      ]
+    }
+  },
+  {
+    "name": "set_radar_mode",
+    "description": "Set radar display mode ('composite', 'velocity', 'rain_rate', 'echo_tops', 'infrared').",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": [
+            "composite",
+            "velocity",
+            "rain_rate",
+            "echo_tops",
+            "infrared"
+          ],
+          "description": "Radar visualization mode"
+        }
+      },
+      "required": [
+        "mode"
+      ]
+    }
+  },
+  {
+    "name": "set_weather_display_mode",
+    "description": "Set weather station map visualization scope ('global': all 1M stations worldwide, 'sector': active viewport only, 'off': hide stations).",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": [
+            "global",
+            "sector",
+            "off"
+          ],
+          "description": "Weather stations view mode"
+        }
+      },
+      "required": [
+        "mode"
+      ]
+    }
+  },
+  {
+    "name": "list_weather_engines",
+    "description": "List all 140+ available keyless weather services, models, and government meteorological agencies supported by the app.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "region": {
+          "type": "string",
+          "description": "Optional regional filter, e.g. 'DACH', 'Europe', 'North America', 'Global'"
+        }
+      }
+    }
+  },
+  {
+    "name": "get_weather_consensus",
+    "description": "Query multi-engine atmospheric consensus across top meteorological models (ECMWF, GFS, ICON, UKMO, Meteo-France) for any coordinates.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "lat": {
+          "type": "number",
+          "description": "Latitude coordinate"
+        },
+        "lon": {
+          "type": "number",
+          "description": "Longitude coordinate"
+        }
+      },
+      "required": [
+        "lat",
+        "lon"
+      ]
+    }
+  },
+  {
+    "name": "get_historical_storm_events",
+    "description": "Query historical severe storm and tornado touchdowns from NOAA archive by year, state, or intensity rating.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "year": {
+          "type": "integer",
+          "description": "Year to query, e.g. 1999, 2011, 2013, 2024"
+        },
+        "state": {
+          "type": "string",
+          "description": "Two-letter US state code, e.g. 'OK', 'KS', 'TX'"
+        },
+        "min_ef": {
+          "type": "integer",
+          "description": "Minimum EF rating (1-5)"
+        },
+        "limit": {
+          "type": "integer",
+          "description": "Maximum records to return (default: 50)"
+        }
+      }
+    }
+  },
+  {
+    "name": "get_camera_stream_url",
+    "description": "Get direct stream URL or CORS-proxied playback URL for any webcam by camera ID.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "camera_id": {
+          "type": "string",
+          "description": "Target camera ID"
+        },
+        "proxied": {
+          "type": "boolean",
+          "description": "True to return rewritten /api/proxy/stream URL"
+        }
+      },
+      "required": [
+        "camera_id"
+      ]
+    }
+  },
+  {
+    "name": "search_webcams_by_network",
+    "description": "Search real cameras specifically filtered by provider network (Windy, TfL, Autobahn, Panomax, EarthCam, WSDOT, etc.).",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "network": {
+          "type": "string",
+          "description": "Network/provider name, e.g. 'Panomax', 'TfL', 'Autobahn', 'Windy'"
+        },
+        "query": {
+          "type": "string",
+          "description": "Optional search term"
+        },
+        "limit": {
+          "type": "integer",
+          "description": "Max results to return (default: 50)"
+        }
+      },
+      "required": [
+        "network"
+      ]
+    }
+  },
+  {
+    "name": "set_optical_sensor_filter",
+    "description": "Switch MON-02 video shader post-processing filter ('normal', 'nvg': Night Vision, 'flir': Thermal, 'mono': High-contrast B&W).",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "filter_mode": {
+          "type": "string",
+          "enum": [
+            "normal",
+            "nvg",
+            "flir",
+            "mono"
+          ],
+          "description": "Shader filter mode"
+        }
+      },
+      "required": [
+        "filter_mode"
+      ]
+    }
+  },
+  {
+    "name": "flush_system_ram",
+    "description": "Trigger immediate memory cleanup and garbage collection across stream proxy caches, releasing unused memory.",
+    "parameters": {
+      "type": "object",
+      "properties": {}
+    }
+  },
+  {
+    "name": "get_system_health",
+    "description": "Comprehensive system diagnostic report: memory usage, active threads, node index statistics, and backend uptime.",
+    "parameters": {
+      "type": "object",
+      "properties": {}
+    }
+  },
+  {
+    "name": "connect_to_bridge",
+    "description": "Manually verify, health-check, or reconnect the AI Agent to the live OSINT command board backend bridge (FastAPI server on http://127.0.0.1:8888). Returns connection latency, bridge status, system health, and active layout.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "bridge_url": {
+          "type": "string",
+          "description": "URL of the live OSINT backend bridge (defaults to 'http://127.0.0.1:8888')"
+        },
+        "force_reconnect": {
+          "type": "boolean",
+          "description": "Whether to force reset and re-establish session sockets"
+        }
+      }
+    }
+  },
+  {
+    "name": "zoom_map_zone",
+    "description": "Zooms tactical map MON-01 to a target geographical location (latitude, longitude, and zoom level) and selects a specific tactical zone/sector (e.g. 'Seattle Transit Corridor', 'Oklahoma Tornado Alley', 'Zugspitze Alps'). Updates the board viewport state.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "lat": {
+          "type": "number",
+          "description": "Target latitude in decimal degrees (-90 to 90)"
+        },
+        "lon": {
+          "type": "number",
+          "description": "Target longitude in decimal degrees (-180 to 180)"
+        },
+        "zoom": {
+          "type": "integer",
+          "description": "Tactical zoom level (integer from 2 to 18, default 10)"
+        },
+        "zone_name": {
+          "type": "string",
+          "description": "Tactical zone or sector label (e.g., 'Zugspitze Alps', 'Seattle Downtown')"
+        },
+        "include_radar": {
+          "type": "boolean",
+          "description": "Whether Doppler radar overlay should be active"
+        }
+      },
+      "required": [
+        "lat",
+        "lon"
+      ]
+    }
+  },
+  {
+    "name": "capture_mon1_map_image",
+    "description": "Captures the currently zoomed tactical map on MON-01 as a slightly compressed 770p image (1368x770, ~50-80 KB JPEG). Features dark tactical cartography, live Doppler radar precipitation composite, and an HUD reticle overlay. Saves to backend/data/captures/mon1_map_770p.jpg and returns the image path and base64 preview to the AI agent.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "lat": {
+          "type": "number",
+          "description": "Latitude (optional, defaults to current zoomed viewport)"
+        },
+        "lon": {
+          "type": "number",
+          "description": "Longitude (optional, defaults to current zoomed viewport)"
+        },
+        "zoom": {
+          "type": "integer",
+          "description": "Zoom level (optional, defaults to current zoomed viewport)"
+        },
+        "zone_name": {
+          "type": "string",
+          "description": "Zone name (optional, defaults to current zone)"
+        },
+        "include_radar": {
+          "type": "boolean",
+          "description": "Whether to composite live Doppler radar overlay (default True)"
+        },
+        "quality": {
+          "type": "integer",
+          "description": "JPEG compression quality (default 80)"
+        }
+      }
+    }
+  },
+  {
+    "name": "select_camera_and_timeline",
+    "description": "Selects an optical webcam / surveillance camera for MON-02 and sets its timeline horizon (live, day, month, year, lifetime) or specific timestamp. Updates MON-02 state on the command board.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "camera_id": {
+          "type": "string",
+          "description": "Camera identifier (e.g. 'px_zugspitze', 'wsdot_i5_seattle_pine', or ID from search_cameras)"
+        },
+        "timeline_mode": {
+          "type": "string",
+          "enum": [
+            "live",
+            "day",
+            "month",
+            "year",
+            "lifetime"
+          ],
+          "description": "Surveillance timeline horizon"
+        },
+        "timestamp": {
+          "type": "string",
+          "description": "Optional historical ISO timestamp or archive key (e.g. '2026-10-10 12:00:00')"
+        }
+      },
+      "required": [
+        "camera_id"
+      ]
+    }
+  },
+  {
+    "name": "capture_mon2_camera_image",
+    "description": "Captures the active camera frame on MON-02 for the selected timeline horizon as a slightly compressed 770p image (1368x770, ~50-80 KB JPEG). Supports optical sensor shader filters (normal, nvg night vision, flir thermal, mono) and overlays tactical OSD telemetry. Saves to backend/data/captures/mon2_cam_770p.jpg and returns the image path and base64 preview to the AI agent.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "camera_id": {
+          "type": "string",
+          "description": "Camera ID (optional, defaults to active camera on MON-02)"
+        },
+        "timeline_mode": {
+          "type": "string",
+          "enum": [
+            "live",
+            "day",
+            "month",
+            "year",
+            "lifetime"
+          ],
+          "description": "Timeline horizon (optional, defaults to current timeline mode)"
+        },
+        "timestamp": {
+          "type": "string",
+          "description": "Optional specific timestamp"
+        },
+        "filter_mode": {
+          "type": "string",
+          "enum": [
+            "normal",
+            "nvg",
+            "flir",
+            "mono"
+          ],
+          "description": "Optical shader filter (normal, nvg green phosphor, flir ironbow, mono surveillance)"
+        },
+        "quality": {
+          "type": "integer",
+          "description": "JPEG compression quality (default 80)"
+        }
+      }
+    }
+  }
+]

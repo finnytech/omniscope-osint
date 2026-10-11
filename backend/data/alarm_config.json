@@ -1,0 +1,14 @@
+{
+  "twister_tornado": true,
+  "supercell": true,
+  "hook_echo": true,
+  "min_ef_scale": 0,
+  "min_wind_gust_mph": 70,
+  "min_hail_size_inches": 1.0,
+  "flash_flood": false,
+  "severe_thunderstorm": true,
+  "sound_siren": true,
+  "desktop_notification": true,
+  "auto_jump_to_feed": true,
+  "polling_interval_sec": 60
+}
