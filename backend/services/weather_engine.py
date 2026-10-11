@@ -1236,7 +1236,9 @@ class WeatherEngine:
         detection_tags = []
         is_ground_confirmed = False
 
-        # 1. Check 'Tornado: Observed' in params or text
+
+
+        # 1. Check genuine observed ground touchdown signals
         if any("OBSERVED" in v for v in detection_vals):
             detection_tags.append("Tornado: Observed (NOAA Parameter)")
             is_ground_confirmed = True
@@ -1244,27 +1246,21 @@ class WeatherEngine:
             detection_tags.append("Tornado: Observed (Text Alert)")
             is_ground_confirmed = True
 
-        # 2. Check 'Damage Threat: Catastrophic' / 'Considerable'
-        if any("CATASTROPHIC" in v for v in damage_threat_vals):
-            detection_tags.append("Tornado Damage Threat: Catastrophic")
-            is_ground_confirmed = True
-        elif ("TORNADO DAMAGE THREAT...CATASTROPHIC" in combined_upper) or ("DAMAGE THREAT: CATASTROPHIC" in combined_upper) or ("TORNADO DAMAGE THREAT: CATASTROPHIC" in combined_upper):
-            detection_tags.append("Tornado Damage Threat: Catastrophic")
+        # 2. Check Catastrophic / Tornado Emergency or Considerable threat
+        if any("CATASTROPHIC" in v for v in damage_threat_vals) or ("TORNADO DAMAGE THREAT...CATASTROPHIC" in combined_upper) or ("DAMAGE THREAT: CATASTROPHIC" in combined_upper):
+            detection_tags.append("Tornado Damage Threat: Catastrophic (Tornado Emergency)")
             is_ground_confirmed = True
 
-        if any("CONSIDERABLE" in v for v in damage_threat_vals):
-            detection_tags.append("Tornado Damage Threat: Considerable")
-            is_ground_confirmed = True
-        elif ("TORNADO DAMAGE THREAT...CONSIDERABLE" in combined_upper) or ("DAMAGE THREAT: CONSIDERABLE" in combined_upper):
+        if any("CONSIDERABLE" in v for v in damage_threat_vals) or ("TORNADO DAMAGE THREAT...CONSIDERABLE" in combined_upper) or ("DAMAGE THREAT: CONSIDERABLE" in combined_upper):
             detection_tags.append("Tornado Damage Threat: Considerable")
             is_ground_confirmed = True
 
-        # 3. Check 'Particularly Dangerous Situation / PDS'
+        # 3. Check PDS (Particularly Dangerous Situation)
         if ("PARTICULARLY DANGEROUS SITUATION" in combined_upper) or re.search(r'\bPDS\b', combined_upper):
             detection_tags.append("Particularly Dangerous Situation (PDS)")
             is_ground_confirmed = True
 
-        # 4. Check explicit ground touchdown phrases
+        # 4. Check explicit ground touchdown phrases in text
         ground_phrases = [
             "CONFIRMED GROUND CONTACT",
             "TORNADO ON THE GROUND",
@@ -1280,87 +1276,84 @@ class WeatherEngine:
                 is_ground_confirmed = True
                 break
 
-        # 5. Check EF-Scale ratings
+        # 5. Check if Radar Indicated Rotation
+        is_radar_indicated = not is_ground_confirmed
+        if is_radar_indicated:
+            if any("RADAR" in v for v in detection_vals) or ("RADAR INDICATED" in combined_upper) or ("TORNADO...RADAR INDICATED" in combined_upper):
+                detection_tags.append("Radar Indicated Rotation (Doppler Mesocyclone Aloft)")
+            else:
+                detection_tags.append("Tornado Warning (Doppler-Rotation)")
+
+        # 6. Check if an official EF-Scale rating was explicitly mentioned by NWS (e.g. from an ongoing survey)
         ef_match = re.search(r'\b(EF[- ]?[0-5])\b', combined_upper)
         ef_rating = None
         if ef_match:
             ef_rating = ef_match.group(1).replace(" ", "-")
-            detection_tags.append(f"EF-Scale Rating: {ef_rating}")
-            is_ground_confirmed = True
+            detection_tags.append(f"EF-Scale Bulletin: {ef_rating}")
+        else:
+            # ZERO FAKE: Never fabricate EF ratings!
+            ef_rating = "AUSSTEHEND (DAMAGE SURVEY)" if is_ground_confirmed else "N/A (RADAR INDICATED)"
 
-        if not is_ground_confirmed:
-            return None
-
-        # Determine Threat Level
-        threat_level = "OBSERVED GROUND CONTACT"
-        if any("Catastrophic" in t for t in detection_tags) or "CATASTROPHIC" in combined_upper:
-            threat_level = "CATASTROPHIC (TORNADO EMERGENCY)"
-        elif any("PDS" in t for t in detection_tags) or "PARTICULARLY DANGEROUS SITUATION" in combined_upper:
-            threat_level = "PARTICULARLY DANGEROUS SITUATION (PDS)"
-        elif any("Considerable" in t for t in detection_tags):
-            threat_level = "CONSIDERABLE THREAT"
+        # Threat Level
+        if is_ground_confirmed:
+            if any("Catastrophic" in t for t in detection_tags) or "CATASTROPHIC" in combined_upper:
+                threat_level = "CATASTROPHIC (TORNADO EMERGENCY)"
+            elif any("PDS" in t for t in detection_tags) or "PARTICULARLY DANGEROUS SITUATION" in combined_upper:
+                threat_level = "PARTICULARLY DANGEROUS SITUATION (PDS)"
+            elif any("Considerable" in t for t in detection_tags):
+                threat_level = "CONSIDERABLE THREAT"
+            else:
+                threat_level = "OBSERVED GROUND CONTACT"
+        else:
+            threat_level = "RADAR INDICATED ROTATION (KEIN BODENKONTAKT)"
 
         # Telemetry & Centroid resolution
         telem = self._parse_alert_telemetry(props, geometry)
         wind_speed_mph = telem.get("wind_gust_mph")
         wind_speed_str = telem.get("wind_speed")
 
-        if not wind_speed_mph:
-            if "CATASTROPHIC" in threat_level:
-                wind_speed_mph = 165
-            elif "PDS" in threat_level:
-                wind_speed_mph = 140
-            else:
-                wind_speed_mph = 115
-            wind_speed_kmh = int(round(wind_speed_mph * 1.60934))
-            wind_speed_str = f"{wind_speed_mph} MPH ({wind_speed_kmh} km/h)"
-        else:
+        # ZERO FAKE: If no measured wind speed, do NOT fabricate 165 or 140 MPH
+        if wind_speed_mph:
             wind_speed_kmh = int(round(wind_speed_mph * 1.60934))
             if not wind_speed_str:
                 wind_speed_str = f"{wind_speed_mph} MPH ({wind_speed_kmh} km/h)"
-
-        # Infer EF scale if not explicitly stated
-        if not ef_rating:
-            if wind_speed_mph >= 200:
-                ef_rating = "EF-5"
-            elif wind_speed_mph >= 165:
-                ef_rating = "EF-4"
-            elif wind_speed_mph >= 136:
-                ef_rating = "EF-3"
-            elif wind_speed_mph >= 111:
-                ef_rating = "EF-2"
-            elif wind_speed_mph >= 86:
-                ef_rating = "EF-1"
-            else:
-                ef_rating = "EF-0"
+        else:
+            wind_speed_kmh = None
+            wind_speed_str = "Bodenmessung ausstehend" if is_ground_confirmed else "Doppler-Rotation (Nicht gemessen)"
 
         motion_deg = telem.get("motion_deg")
         motion_kts = telem.get("motion_kts")
         motion_str = telem.get("motion_vector") or "240° (WSW) @ 35 KTS (65 km/h)"
 
         centroid = {"lat": telem["lat"], "lon": telem["lon"]}
-        alert_id = str(props.get("id") or props.get("@id") or f"tornado_ground_{int(time.time())}")
+        alert_id = str(props.get("id") or props.get("@id") or f"tornado_event_{int(time.time())}")
+
+        status = "CONFIRMED_GROUND_CONTACT" if is_ground_confirmed else "RADAR_INDICATED_ROTATION"
+        event_label = "TORNADO WARNING // CONFIRMED GROUND CONTACT" if is_ground_confirmed else "TORNADO WARNING // RADAR INDICATED ROTATION"
+        headline_label = headline or (f"Tornado Confirmed On Ground in {props.get('areaDesc', 'Active Sector')}" if is_ground_confirmed else f"Radar Indicated Rotation in {props.get('areaDesc', 'Active Sector')}")
 
         return {
             "id": alert_id,
-            "event": "TORNADO WARNING // CONFIRMED GROUND CONTACT",
-            "headline": headline or f"Tornado Confirmed On Ground in {props.get('areaDesc', 'Active Sector')}",
-            "status": "CONFIRMED_GROUND_CONTACT",
-            "severity": "Extreme",
+            "event": event_label,
+            "headline": headline_label,
+            "status": status,
+            "is_ground_confirmed": is_ground_confirmed,
+            "is_radar_indicated": is_radar_indicated,
+            "severity": "Extreme" if is_ground_confirmed else props.get("severity", "Severe"),
             "urgency": props.get("urgency", "Immediate"),
-            "certainty": props.get("certainty", "Observed"),
+            "certainty": props.get("certainty", "Observed" if is_ground_confirmed else "Possible"),
             "threat_level": threat_level,
             "ef_scale": ef_rating,
             "wind_speed": wind_speed_str,
             "wind_speed_mph": wind_speed_mph,
             "wind_speed_kmh": wind_speed_kmh,
-            "hail_size": telem.get("hail_size"),
+            "hail_size": telem.get("hail_size") or ("Kein Hagel gemeldet" if not telem.get("hail_size_inches") else None),
             "hail_size_inches": telem.get("hail_size_inches"),
             "motion_vector": motion_str,
             "motion_deg": motion_deg,
             "motion_kts": motion_kts,
             "area_description": props.get("areaDesc", "Active Sector"),
-            "detection_source": "NOAA NWS OBSERVED RADAR / SPOTTER CONFIRMED",
+            "detection_source": "NOAA NWS OBSERVED RADAR / SPOTTER CONFIRMED" if is_ground_confirmed else "NOAA NEXRAD DOPPLER AZIMUTHAL SHEAR",
             "detection_tags": detection_tags,
             "geometry": geometry,
             "centroid": centroid,
@@ -1371,6 +1364,7 @@ class WeatherEngine:
             "description": desc,
             "instruction": instruction
         }
+
 
     def get_severe_alerts(
         self,
@@ -1546,18 +1540,24 @@ class WeatherEngine:
 
     def get_tornado_ground_alerts(self) -> Dict[str, Any]:
         """
-        Returns active confirmed Tornado-on-Ground events parsed directly from NOAA severe weather alerts.
-        Filters strictly for: 'Tornado: Observed', 'tornado damage threat: catastrophic',
-        'particularly dangerous situation / PDS', and verified ground contact EF ratings.
+        Returns active Tornado events parsed directly from NOAA severe weather alerts.
+        Distinguishes strictly between confirmed ground contact (observed) and radar-indicated rotation.
         """
         alerts_data = self.get_severe_alerts()
-        ground_alerts = alerts_data.get("tornado_ground_alerts", [])
+        all_tornado_alerts = alerts_data.get("tornado_ground_alerts", [])
+        confirmed_ground = [a for a in all_tornado_alerts if a.get("is_ground_confirmed") is True]
+        radar_indicated = [a for a in all_tornado_alerts if a.get("is_ground_confirmed") is not True]
         return {
-            "total_tornadoes_on_ground": len(ground_alerts),
-            "tornado_ground_alerts": ground_alerts,
+            "total_tornadoes_on_ground": len(confirmed_ground),
+            "total_radar_indicated": len(radar_indicated),
+            "total_tornado_alerts": len(all_tornado_alerts),
+            "tornado_ground_alerts": all_tornado_alerts,
+            "confirmed_ground_alerts": confirmed_ground,
+            "radar_indicated_alerts": radar_indicated,
             "fetched_at": alerts_data.get("fetched_at"),
             "cached": alerts_data.get("cached", False)
         }
+
 
 
 # Singleton instance for quick module-level imports
