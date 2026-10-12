@@ -54,3 +54,6 @@ screenshots/
 .idea/
 .DS_Store
 Thumbs.db
+
+# Release artifacts (Unpacked build tree ignored; portable zip & APK tracked)
+releases/windows/OmniScope/

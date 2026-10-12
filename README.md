@@ -54,9 +54,20 @@ For advanced enterprise capabilities, you can optionally connect third-party key
 - **AirNow EPA** (`AIRNOW_API_KEY`): US Environmental Protection Agency AQI feeds at [docs.airnowapi.org](https://docs.airnowapi.org/).
 - **OpenRouteService** (`OPENROUTESERVICE_KEY`): Matrix routing and geocoding at [openrouteservice.org](https://openrouteservice.org/).
 
+## 📦 Standalone Releases (Windows Native EXE & Android APK)
+
+Fertig kompilierte Standalone-Releases ohne Notwendigkeit einer manuellen Python-Umgebung:
+
+| Edition | Datei | Plattform | Besonderheiten |
+| :--- | :--- | :--- | :--- |
+| **Android APK** | [`OmniScope-v1.0.apk`](releases/android/OmniScope-v1.0.apk) | Android 7.0 bis 15+ | 100% Offline/Standalone, Touch-UI, 1.500 eingebettete Webcams, kryptographisch v2/v3 signiert (~338 KB) |
+| **Windows Native EXE** | [`OmniScope-v1.0-Windows-x64.zip`](releases/windows/OmniScope-v1.0-Windows-x64.zip) | Windows 10 & 11 (64-Bit) | Echtes natives WebView2-Fenster, kein externer Browser-Popup, Single-Instance, F11-Kommandomodus (~45 MB) |
+
+Ausführliche Installations- und Systemhinweise findest du in der [Releases Dokumentation](releases/README.md).
+
 ---
 
-## 🚀 Quick Start Guide
+## 🚀 Quick Start Guide (Entwickler / Source Code)
 
 ### Windows (1-Click Launcher)
 Simply double-click `start.bat` or run:
