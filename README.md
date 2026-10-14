@@ -1,4 +1,22 @@
-# 🌐 OmniScope OSINT
+# 🌐 OmniScope OSINT [OFFICIAL ORIGINAL]
+
+[![Official Original Project](https://img.shields.io/badge/OmniScope-OFFICIAL%20ORIGINAL-00ffcc?style=for-the-badge&logo=shield)](https://github.com/finnytech/omniscope-osint)
+[![FinnyTech Original](https://img.shields.io/badge/Author-FinnyTech-ff0055?style=for-the-badge)](https://github.com/finnytech)
+[![Web Edition](https://img.shields.io/badge/Web%20Edition-omniscope--web.pages.dev-blue?style=for-the-badge)](https://omniscope-web.pages.dev)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](LICENSE)
+
+> [!IMPORTANT]
+> ### 🚨 OFFICIAL REPOSITORY & INTELLECTUAL PROPERTY NOTICE
+> **OmniScope™ is the original, authentic open-source tactical OSINT operations center developed exclusively by [FinnyTech](https://github.com/finnytech).**
+>
+> ⚠️ **BEWARE OF UNAUTHORIZED CLONES & COPYCATS**:
+> Following viral social media coverage, third parties (such as *"Sam Good Group / OmniScope Lite"*) have begun attempting to copy the interface, branding, and concept of OmniScope.
+>
+> - **Official Native / Desktop OSINT Repository**: [`https://github.com/finnytech/omniscope-osint`](https://github.com/finnytech/omniscope-osint)
+> - **Official Web Edition Repository**: [`https://github.com/finnytech/omniscope-web`](https://github.com/finnytech/omniscope-web)
+> - **Canonical Live Web App**: [`https://omniscope-web.pages.dev`](https://omniscope-web.pages.dev)
+>
+> Always verify that you are cloning and contributing to the official **FinnyTech** repositories.
 
 > **Open-Source Dual-Monitor Geospatial Intelligence, Weather Radar & Public Sensor Grid**  
 > *100% Legal & Open Data • Zero-Fake Policy • Dynamic Provider Omission • Fast SQLite Spatial Indexing*
