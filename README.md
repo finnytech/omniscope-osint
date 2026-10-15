@@ -147,6 +147,50 @@ Running `setup_wizard.py` launches a terminal setup assistant:
 
 ---
 
+## 🤖 Model Context Protocol (MCP) Integration (Localhost & Standalone EXE)
+
+OmniScope OSINT includes a high-performance, local Model Context Protocol (MCP) server providing **50 granular, typed tools** connecting directly to the local SQLite spatial database (`nodes.db` / `omniscope_spatial.db` with over 1,000,000 indexed nodes) and real-time sensor pipelines:
+
+### 1. Run from Source (Localhost):
+```bash
+python run_mcp.py
+```
+Or via `run_server.py`:
+```bash
+python run_server.py --mcp
+```
+
+### 2. Run from Standalone Windows `.exe`:
+```cmd
+OmniScope.exe --mcp
+```
+
+### 3. Configure in Claude Desktop (`claude_desktop_config.json`):
+```json
+{
+  "mcpServers": {
+    "omniscope-local": {
+      "command": "python",
+      "args": ["D:/projects/omniscope-osint/run_mcp.py"]
+    }
+  }
+}
+```
+
+### 4. Configure in Cursor (`.cursor/mcp.json`):
+```json
+{
+  "mcpServers": {
+    "omniscope-local": {
+      "command": "python",
+      "args": ["D:/projects/omniscope-osint/run_mcp.py"]
+    }
+  }
+}
+```
+
+---
+
 ## 📄 License
 
 Distributed under the **MIT License**. See `LICENSE` for details.

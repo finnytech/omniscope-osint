@@ -123,10 +123,11 @@ class CameraEngine:
         base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         if not db_path or db_path.endswith(".json"):
             db_candidates = [
+                os.path.join(base_dir, "data", "nodes.db"),
                 os.path.join(base_dir, "data", "omniscope_spatial.db"),
                 os.path.join(base_dir, "data", "nexus_spatial.db"),
             ]
-            self.db_path = next((p for p in db_candidates if os.path.exists(p)), db_candidates[0])
+            self.db_path = next((p for p in db_candidates if os.path.exists(p)), db_candidates[1])
         else:
             self.db_path = db_path
 
@@ -435,8 +436,11 @@ class CameraEngine:
 
             sql += "LIMIT ?"
             params.append(max_rows)
-            cur.execute(sql, params)
-            rows = cur.fetchall()
+            try:
+                cur.execute(sql, params)
+                rows = cur.fetchall()
+            except Exception:
+                return []
 
             res = []
             for r in rows:
@@ -626,25 +630,32 @@ class CameraEngine:
         sql += " LIMIT ? OFFSET ?"
         params.extend([page_size, offset])
 
-        cur.execute(sql, params)
-        rows = cur.fetchall()
-        return [self.sanitize_camera_record(json.loads(r[0])) for r in rows if r[0]]
+        try:
+            cur.execute(sql, params)
+            rows = cur.fetchall()
+            return [self.sanitize_camera_record(json.loads(r[0])) for r in rows if r[0]]
+        except Exception:
+            return []
 
     def get_cameras_by_provider(self, provider: str = "all", limit: int = 50, offset: int = 0) -> Dict:
         conn = self._get_conn()
         cur = conn.cursor()
 
         p_lower = (provider or "all").lower().strip()
-        if not p_lower or p_lower == "all":
-            total = getattr(self, "_total_cameras", self.total_cameras_count)
-            cur.execute("SELECT payload FROM cameras LIMIT ? OFFSET ?;", (limit, offset))
-        else:
-            total = self._providers_count_map.get(p_lower, 0)
-            target_prov = self._provider_canonical_map.get(p_lower, provider)
-            cur.execute("SELECT payload FROM cameras WHERE provider = ? LIMIT ? OFFSET ?;", (target_prov, limit, offset))
+        try:
+            if not p_lower or p_lower == "all":
+                total = getattr(self, "_total_cameras", self.total_cameras_count)
+                cur.execute("SELECT payload FROM cameras LIMIT ? OFFSET ?;", (limit, offset))
+            else:
+                total = self._providers_count_map.get(p_lower, 0)
+                target_prov = self._provider_canonical_map.get(p_lower, provider)
+                cur.execute("SELECT payload FROM cameras WHERE provider = ? LIMIT ? OFFSET ?;", (target_prov, limit, offset))
 
-        rows = cur.fetchall()
-        cameras = [self.sanitize_camera_record(json.loads(r[0])) for r in rows if r[0]]
+            rows = cur.fetchall()
+            cameras = [self.sanitize_camera_record(json.loads(r[0])) for r in rows if r[0]]
+        except Exception:
+            total = 0
+            cameras = []
         if total == 0 and cameras:
             total = len(cameras)
         return {

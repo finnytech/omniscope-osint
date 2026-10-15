@@ -95,7 +95,17 @@ def enforce_single_instance(port: int):
     atexit.register(cleanup_pid)
 
 def run():
-    port = int(sys.argv[1]) if len(sys.argv) > 1 else 8888
+    if "--mcp" in sys.argv:
+        from backend.services.osint_mcp_server import run_stdio_server
+        try:
+            run_stdio_server()
+        except (KeyboardInterrupt, SystemExit):
+            os._exit(0)
+        except BaseException:
+            os._exit(0)
+        return
+
+    port = int(sys.argv[1]) if len(sys.argv) > 1 and sys.argv[1].isdigit() else 8888
     enforce_single_instance(port)
 
     print(f'[*] OmniScope OSINT starting on 0.0.0.0:{port} [PID: {os.getpid()}]', flush=True)

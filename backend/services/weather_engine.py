@@ -27,7 +27,9 @@ if not logger.handlers:
 
 _data_dir = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "data")
 DEFAULT_DB_PATH = (
-    os.path.join(_data_dir, "omniscope_spatial.db")
+    os.path.join(_data_dir, "nodes.db")
+    if os.path.exists(os.path.join(_data_dir, "nodes.db"))
+    else os.path.join(_data_dir, "omniscope_spatial.db")
     if os.path.exists(os.path.join(_data_dir, "omniscope_spatial.db"))
     else os.path.join(_data_dir, "nexus_spatial.db")
 )
@@ -368,10 +370,11 @@ class WeatherEngine:
         base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         if not db_path:
             db_candidates = [
+                os.path.join(base_dir, "data", "nodes.db"),
                 os.path.join(base_dir, "data", "omniscope_spatial.db"),
                 os.path.join(base_dir, "data", "nexus_spatial.db"),
             ]
-            self.db_path = next((p for p in db_candidates if os.path.exists(p)), db_candidates[0])
+            self.db_path = next((p for p in db_candidates if os.path.exists(p)), db_candidates[1])
         else:
             self.db_path = db_path
         self._local = threading.local()
@@ -400,9 +403,9 @@ class WeatherEngine:
 
     def _load_stations(self):
         """Initializes zero-memory station index connected to SQLite."""
-        conn = self._get_conn()
-        cur = conn.cursor()
         try:
+            conn = self._get_conn()
+            cur = conn.cursor()
             cur.execute("SELECT value FROM system_metadata WHERE key = 'weather_stations';")
             row = cur.fetchone()
             total_count = int(row[0]) if row else 505000
@@ -413,13 +416,13 @@ class WeatherEngine:
 
     def get_station_by_id(self, station_id: str) -> Optional[Dict[str, Any]]:
         """Lookup a station directly by its identifier from SQLite."""
-        conn = self._get_conn()
-        cur = conn.cursor()
-        cur.execute("SELECT payload FROM weather_stations WHERE id = ?;", (station_id,))
-        row = cur.fetchone()
-        if not row:
-            return None
         try:
+            conn = self._get_conn()
+            cur = conn.cursor()
+            cur.execute("SELECT payload FROM weather_stations WHERE id = ?;", (station_id,))
+            row = cur.fetchone()
+            if not row:
+                return None
             return json.loads(row[0])
         except Exception:
             return None
@@ -436,24 +439,39 @@ class WeatherEngine:
         """
         Sub-millisecond spatial query of weather stations within a bounding box via SQLite index.
         """
-        conn = self._get_conn()
-        cur = conn.cursor()
+        try:
+            conn = self._get_conn()
+            cur = conn.cursor()
+            max_limit = limit
 
-        max_limit = limit
+            cols = "id, name, lat, lon, elevation, country, payload"
+            if min_lon > max_lon:
+                sql = f"SELECT {cols} FROM weather_stations WHERE lat BETWEEN ? AND ? AND (lon >= ? OR lon <= ?) LIMIT ?;"
+                params = [min_lat, max_lat, min_lon, max_lon, max_limit]
+            else:
+                sql = f"SELECT {cols} FROM weather_stations WHERE lat BETWEEN ? AND ? AND lon BETWEEN ? AND ? LIMIT ?;"
+                params = [min_lat, max_lat, min_lon, max_lon, max_limit]
 
-        cols = "id, name, lat, lon, elevation, country, source, wmo_id"
-        if min_lon > max_lon:
-            sql = f"SELECT {cols} FROM weather_stations WHERE lat BETWEEN ? AND ? AND (lon >= ? OR lon <= ?) LIMIT ?;"
-            params = [min_lat, max_lat, min_lon, max_lon, max_limit]
-        else:
-            sql = f"SELECT {cols} FROM weather_stations WHERE lat BETWEEN ? AND ? AND lon BETWEEN ? AND ? LIMIT ?;"
-            params = [min_lat, max_lat, min_lon, max_lon, max_limit]
+            cur.execute(sql, params)
+            rows = cur.fetchall()
+        except Exception as e:
+            logger.warning(f"[WeatherEngine] Spatial query skipped/handled gracefully: {e}")
+            return []
 
-        cur.execute(sql, params)
-        rows = cur.fetchall()
         results = []
         for r in rows:
-            st_id, name, lat, lon, elev, ctry, src, wmo = r
+            st_id, name, lat, lon, elev, ctry, payload_raw = r
+            pdata = {}
+            if payload_raw:
+                try:
+                    pdata = json.loads(payload_raw) if isinstance(payload_raw, str) else payload_raw
+                except Exception:
+                    pdata = {}
+            src = pdata.get("provider") or pdata.get("source") or "wmo"
+            wmo = pdata.get("wmo_id") or ""
+            continent = pdata.get("continent") or "Global"
+            stype = pdata.get("type") or src
+
             # Exclude phantom stations floating in open ocean
             if is_in_open_ocean(lat, lon):
                 if not (st_id.startswith("ndbc_") or src == "marine_buoy" or "buoy" in (name or "").lower()):
@@ -468,10 +486,10 @@ class WeatherEngine:
                 "lon": lon,
                 "elevation": elev or 0,
                 "country": ctry or "Global",
-                "continent": "Global",
-                "type": src or "wmo",
-                "provider": src or "Meteorological Ground Station",
-                "wmo_id": wmo or ""
+                "continent": continent,
+                "type": stype,
+                "provider": src,
+                "wmo_id": wmo
             })
         return results
 
@@ -485,51 +503,60 @@ class WeatherEngine:
         continent: Optional[str] = None
     ) -> Dict[str, Any]:
         """Query and paginate weather stations with SQLite filtering."""
-        conn = self._get_conn()
-        cur = conn.cursor()
+        try:
+            conn = self._get_conn()
+            cur = conn.cursor()
 
-        sql = "SELECT payload FROM weather_stations WHERE 1=1"
-        count_sql = "SELECT COUNT(*) FROM weather_stations WHERE 1=1"
-        params = []
+            sql = "SELECT payload FROM weather_stations WHERE 1=1"
+            count_sql = "SELECT COUNT(*) FROM weather_stations WHERE 1=1"
+            params = []
 
-        if country:
-            sql += " AND LOWER(country) LIKE ?"
-            count_sql += " AND LOWER(country) LIKE ?"
-            params.append(f"%{country.strip().lower()}%")
-        if station_type:
-            sql += " AND LOWER(source) = ?"
-            count_sql += " AND LOWER(source) = ?"
-            params.append(station_type.strip().lower())
-        if query:
-            q_like = f"%{query.strip().lower()}%"
-            sql += " AND (LOWER(name) LIKE ? OR LOWER(id) LIKE ?)"
-            count_sql += " AND (LOWER(name) LIKE ? OR LOWER(id) LIKE ?)"
-            params.extend([q_like, q_like])
+            if country:
+                sql += " AND LOWER(country) LIKE ?"
+                count_sql += " AND LOWER(country) LIKE ?"
+                params.append(f"%{country.strip().lower()}%")
+            if station_type:
+                sql += " AND LOWER(payload) LIKE ?"
+                count_sql += " AND LOWER(payload) LIKE ?"
+                params.append(f"%{station_type.strip().lower()}%")
+            if query:
+                q_like = f"%{query.strip().lower()}%"
+                sql += " AND (LOWER(name) LIKE ? OR LOWER(id) LIKE ?)"
+                count_sql += " AND (LOWER(name) LIKE ? OR LOWER(id) LIKE ?)"
+                params.extend([q_like, q_like])
 
-        cur.execute(count_sql, params)
-        total = cur.fetchone()[0]
+            cur.execute(count_sql, params)
+            total = cur.fetchone()[0]
 
-        if limit is not None:
-            sql += " LIMIT ? OFFSET ?"
-            fetch_params = params + [limit, offset]
-        else:
-            fetch_params = params
+            if limit is not None:
+                sql += " LIMIT ? OFFSET ?"
+                fetch_params = params + [limit, offset]
+            else:
+                fetch_params = params
 
-        cur.execute(sql, fetch_params)
-        rows = cur.fetchall()
-        stations = []
-        for r in rows:
-            try:
-                stations.append(json.loads(r[0]))
-            except Exception:
-                continue
-
-        return {
-            "total": total,
-            "offset": offset,
-            "limit": limit,
-            "stations": stations
-        }
+            cur.execute(sql, fetch_params)
+            rows = cur.fetchall()
+            stations = []
+            for r in rows:
+                if r[0]:
+                    try:
+                        stations.append(json.loads(r[0]))
+                    except Exception:
+                        pass
+            return {
+                "total": total,
+                "stations": stations,
+                "limit": limit,
+                "offset": offset
+            }
+        except Exception as e:
+            logger.warning(f"[WeatherEngine] get_weather_stations exception handled: {e}")
+            return {
+                "total": 0,
+                "stations": [],
+                "limit": limit,
+                "offset": offset
+            }
 
     def find_nearest_stations(
         self,
