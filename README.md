@@ -14,6 +14,7 @@
 >
 > - **Official Native / Desktop OSINT Repository**: [`https://github.com/finnytech/omniscope-osint`](https://github.com/finnytech/omniscope-osint)
 > - **Official Web Edition Repository**: [`https://github.com/finnytech/omniscope-web`](https://github.com/finnytech/omniscope-web)
+> - **Official Standalone MCP Suite Repository**: [`https://github.com/finnytech/omniscope-mcp`](https://github.com/finnytech/omniscope-mcp)
 > - **Canonical Live Web App**: [`https://omniscope-web.pages.dev`](https://omniscope-web.pages.dev)
 >
 > Always verify that you are cloning and contributing to the official **FinnyTech** repositories.
