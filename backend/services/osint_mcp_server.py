@@ -82,13 +82,33 @@ BOARD_STATE = {
 TOOL_DEFINITIONS: List[Dict[str, Any]] = []
 TOOL_HANDLERS: Dict[str, Any] = {}
 
-def register_tool(name: str, description: str, parameters: Dict[str, Any]):
+def register_tool(
+    name: str,
+    description: str,
+    parameters: Dict[str, Any],
+    readOnlyHint: bool = True,
+    destructiveHint: bool = False,
+    idempotentHint: bool = True,
+    openWorldHint: bool = False
+):
     def decorator(fn):
-        TOOL_DEFINITIONS.append({
+        tool_entry = {
             "name": name,
             "description": description,
-            "parameters": parameters
-        })
+            "parameters": parameters,
+            "inputSchema": parameters,
+            "readOnlyHint": readOnlyHint,
+            "destructiveHint": destructiveHint,
+            "idempotentHint": idempotentHint,
+            "openWorldHint": openWorldHint,
+            "annotations": {
+                "readOnlyHint": readOnlyHint,
+                "destructiveHint": destructiveHint,
+                "idempotentHint": idempotentHint,
+                "openWorldHint": openWorldHint
+            }
+        }
+        TOOL_DEFINITIONS.append(tool_entry)
         TOOL_HANDLERS[name] = fn
         return fn
     return decorator
@@ -109,20 +129,32 @@ def register_tool(name: str, description: str, parameters: Dict[str, Any]):
             "lon": {"type": "number", "description": "Longitude coordinate"},
             "provider": {"type": "string", "description": "Optional weather provider filter"}
         }
-    }
+    },
+    readOnlyHint=True,
+    destructiveHint=False,
+    idempotentHint=True,
+    openWorldHint=True
 )
 async def tool_get_live_weather(location: str = None, lat: float = None, lon: float = None, provider: str = None, **kwargs):
-    if lat is None or lon is None:
-        coords = {"miami": (25.7617, -80.1918), "berlin": (52.5200, 13.4050), "tokyo": (35.6762, 139.6503), "moore": (35.3395, -97.4867)}
-        c = coords.get((location or "").lower(), (52.5200, 13.4050))
-        lat, lon = c[0], c[1]
-    res = weather_engine.get_live_weather(lat, lon)
-    return res
+    try:
+        if lat is None or lon is None:
+            coords = {"miami": (25.7617, -80.1918), "berlin": (52.5200, 13.4050), "tokyo": (35.6762, 139.6503), "moore": (35.3395, -97.4867)}
+            c = coords.get((location or "").lower(), (52.5200, 13.4050))
+            lat, lon = c[0], c[1]
+        res = weather_engine.get_live_weather(lat, lon)
+        return res
+    except Exception as e:
+        logger.error(f"Error in tool_get_live_weather: {e}")
+        return {"status": "error", "message": str(e), "isError": True}
 
 @register_tool(
     name="get_noaa_usa_feed",
     description="Get official NOAA nationwide live observation feed covering all 50 US states with extreme summaries.",
-    parameters={"type": "object", "properties": {}}
+    parameters={"type": "object", "properties": {}},
+    readOnlyHint=True,
+    destructiveHint=False,
+    idempotentHint=True,
+    openWorldHint=True
 )
 async def tool_get_noaa_usa_feed(**kwargs):
     try:
@@ -149,18 +181,34 @@ async def tool_get_noaa_usa_feed(**kwargs):
             "station_id": {"type": "string", "description": "4-letter ICAO station ID (e.g. 'KOKC', 'KJFK')"}
         },
         "required": ["station_id"]
-    }
+    },
+    readOnlyHint=True,
+    destructiveHint=False,
+    idempotentHint=True,
+    openWorldHint=True
 )
 async def tool_get_noaa_station_observation(station_id: str, **kwargs):
-    return await noaa_engine.fetch_station_observation(station_id)
+    try:
+        return await noaa_engine.fetch_station_observation(station_id)
+    except Exception as e:
+        logger.error(f"Error in tool_get_noaa_station_observation: {e}")
+        return {"status": "error", "message": str(e), "isError": True}
 
 @register_tool(
     name="get_nexrad_radar_meta",
     description="Get live NOAA NEXRAD Level-III composite Doppler radar tile specifications, bounds, and reflectivity legend.",
-    parameters={"type": "object", "properties": {}}
+    parameters={"type": "object", "properties": {}},
+    readOnlyHint=True,
+    destructiveHint=False,
+    idempotentHint=True,
+    openWorldHint=True
 )
 async def tool_get_nexrad_radar_meta(**kwargs):
-    return noaa_engine.get_radar_info()
+    try:
+        return noaa_engine.get_radar_info()
+    except Exception as e:
+        logger.error(f"Error in tool_get_nexrad_radar_meta: {e}")
+        return {"status": "error", "message": str(e), "isError": True}
 
 @register_tool(
     name="query_historical_weather",
@@ -174,12 +222,20 @@ async def tool_get_nexrad_radar_meta(**kwargs):
             "lon": {"type": "number", "description": "Optional longitude coordinate"}
         },
         "required": ["date"]
-    }
+    },
+    readOnlyHint=True,
+    destructiveHint=False,
+    idempotentHint=True,
+    openWorldHint=True
 )
 async def tool_query_historical_weather(date: str, location: str = "Moore", lat: float = None, lon: float = None, **kwargs):
-    q_lat = lat if lat is not None else 35.3395
-    q_lon = lon if lon is not None else -97.4867
-    return archive_engine.query_archive(date_str=date, lat=q_lat, lon=q_lon, city=location)
+    try:
+        q_lat = lat if lat is not None else 35.3395
+        q_lon = lon if lon is not None else -97.4867
+        return archive_engine.query_archive(date_str=date, lat=q_lat, lon=q_lon, city=location)
+    except Exception as e:
+        logger.error(f"Error in tool_query_historical_weather: {e}")
+        return {"status": "error", "message": str(e), "isError": True}
 
 @register_tool(
     name="query_tornado_archive",
@@ -191,16 +247,24 @@ async def tool_query_historical_weather(date: str, location: str = "Moore", lat:
             "state": {"type": "string", "description": "2-letter US State abbreviation (e.g. 'OK', 'MO', 'AL')"},
             "preset": {"type": "string", "description": "Preset name (e.g. 'moore_ef5_2013', 'joplin_ef5_2011', 'super_outbreak_2011')"}
         }
-    }
+    },
+    readOnlyHint=True,
+    destructiveHint=False,
+    idempotentHint=True,
+    openWorldHint=True
 )
 async def tool_query_tornado_archive(date: str = None, state: str = None, preset: str = None, **kwargs):
-    if preset:
-        presets = archive_engine.get_presets()
-        p = next((x for x in presets if x.get("id") == preset), None)
-        if p:
-            date = p["date"]
-            state = p.get("state")
-    return archive_engine.fetch_noaa_storm_reports(date_str=date or "2013-05-20", state=state)
+    try:
+        if preset:
+            presets = archive_engine.get_presets()
+            p = next((x for x in presets if x.get("id") == preset), None)
+            if p:
+                date = p["date"]
+                state = p.get("state")
+        return archive_engine.fetch_noaa_storm_reports(date_str=date or "2013-05-20", state=state)
+    except Exception as e:
+        logger.error(f"Error in tool_query_tornado_archive: {e}")
+        return {"status": "error", "message": str(e), "isError": True}
 
 @register_tool(
     name="get_weather_alerts",
@@ -211,16 +275,24 @@ async def tool_query_tornado_archive(date: str = None, state: str = None, preset
             "severity": {"type": "string", "description": "Minimum severity filter: 'Extreme', 'Severe', 'Moderate'"},
             "event_type": {"type": "string", "description": "Filter by event name: 'Tornado Warning', 'Severe Thunderstorm Warning'"}
         }
-    }
+    },
+    readOnlyHint=True,
+    destructiveHint=False,
+    idempotentHint=True,
+    openWorldHint=True
 )
 async def tool_get_weather_alerts(severity: str = None, event_type: str = None, **kwargs):
-    alarms = await weather_alarm_engine.poll_active_alarms(camera_engine)
-    return {
-        "status": "success",
-        "raw_alerts_checked": alarms.get("raw_alerts_checked", 0),
-        "threat_level": alarms.get("overall_threat_level", "NOMINAL"),
-        "active_warnings": alarms.get("active_alarms", [])
-    }
+    try:
+        alarms = await weather_alarm_engine.poll_active_alarms(camera_engine)
+        return {
+            "status": "success",
+            "raw_alerts_checked": alarms.get("raw_alerts_checked", 0),
+            "threat_level": alarms.get("overall_threat_level", "NOMINAL"),
+            "active_warnings": alarms.get("active_alarms", [])
+        }
+    except Exception as e:
+        logger.error(f"Error in tool_get_weather_alerts: {e}")
+        return {"status": "error", "message": str(e), "isError": True}
 
 @register_tool(
     name="get_severe_weather_metrics",
@@ -232,31 +304,47 @@ async def tool_get_weather_alerts(severity: str = None, event_type: str = None, 
             "lon": {"type": "number", "description": "Longitude coordinate"}
         },
         "required": ["lat", "lon"]
-    }
+    },
+    readOnlyHint=True,
+    destructiveHint=False,
+    idempotentHint=True,
+    openWorldHint=True
 )
 async def tool_get_severe_weather_metrics(lat: float, lon: float, **kwargs):
-    obs = weather_engine.get_live_weather(lat, lon)
-    temp = obs.get("temperature", 25.0)
-    wind = obs.get("wind_speed", 15.0)
-    cape = round(max(0, (temp - 15) * 120 + (wind * 15)), 1)
-    shear = round(wind * 1.8 + 10, 1)
-    helicity = round(shear * 6.5, 1)
-    return {
-        "lat": lat, "lon": lon,
-        "convective_available_potential_energy_cape_j_kg": cape,
-        "surface_based_lifted_index": round(- (cape / 500.0), 1),
-        "storm_relative_helicity_srh_m2_s2": helicity,
-        "deep_layer_bulk_wind_shear_kts": shear,
-        "supercell_composite_parameter": round((cape / 1000.0) * (helicity / 50.0) * (shear / 20.0), 2)
-    }
+    try:
+        obs = weather_engine.get_live_weather(lat, lon)
+        temp = obs.get("temperature", 25.0)
+        wind = obs.get("wind_speed", 15.0)
+        cape = round(max(0, (temp - 15) * 120 + (wind * 15)), 1)
+        shear = round(wind * 1.8 + 10, 1)
+        helicity = round(shear * 6.5, 1)
+        return {
+            "lat": lat, "lon": lon,
+            "convective_available_potential_energy_cape_j_kg": cape,
+            "surface_based_lifted_index": round(- (cape / 500.0), 1),
+            "storm_relative_helicity_srh_m2_s2": helicity,
+            "deep_layer_bulk_wind_shear_kts": shear,
+            "supercell_composite_parameter": round((cape / 1000.0) * (helicity / 50.0) * (shear / 20.0), 2)
+        }
+    except Exception as e:
+        logger.error(f"Error in tool_get_severe_weather_metrics: {e}")
+        return {"status": "error", "message": str(e), "isError": True}
 
 @register_tool(
     name="get_space_weather",
     description="Retrieve solar flux, geomagnetic Kp-index, solar flare classifications, and auroral oval boundary data.",
-    parameters={"type": "object", "properties": {}}
+    parameters={"type": "object", "properties": {}},
+    readOnlyHint=True,
+    destructiveHint=False,
+    idempotentHint=True,
+    openWorldHint=True
 )
 async def tool_get_space_weather(**kwargs):
-    return await space_weather_engine.get_space_weather_telemetry()
+    try:
+        return await space_weather_engine.get_space_weather_telemetry()
+    except Exception as e:
+        logger.error(f"Error in tool_get_space_weather: {e}")
+        return {"status": "error", "message": str(e), "isError": True}
 
 @register_tool(
     name="get_air_quality_telemetry",
@@ -268,29 +356,37 @@ async def tool_get_space_weather(**kwargs):
             "lat": {"type": "number", "description": "Latitude"},
             "lon": {"type": "number", "description": "Longitude"}
         }
-    }
+    },
+    readOnlyHint=True,
+    destructiveHint=False,
+    idempotentHint=True,
+    openWorldHint=True
 )
 async def tool_get_air_quality_telemetry(city: str = "Berlin", lat: float = None, lon: float = None, **kwargs):
-    coords = {"berlin": (52.52, 13.405), "miami": (25.76, -80.19), "tokyo": (35.68, 139.69)}
-    c = coords.get((city or "").lower(), (52.52, 13.405))
-    target_lat = lat or c[0]
-    target_lon = lon or c[1]
     try:
-        return await asyncio.wait_for(environment_engine.get_air_quality(lat=target_lat, lon=target_lon), timeout=3.0)
-    except Exception:
-        return {
-            "status": "success",
-            "city": city,
-            "coordinates": {"lat": target_lat, "lon": target_lon},
-            "aqi": 38,
-            "category": "Good",
-            "pm25": 9.2,
-            "pm10": 16.4,
-            "no2": 14.1,
-            "o3": 28.5,
-            "dominant_pollutant": "pm25",
-            "source": "WAQI / OpenAQ Sensor Network"
-        }
+        coords = {"berlin": (52.52, 13.405), "miami": (25.76, -80.19), "tokyo": (35.68, 139.69)}
+        c = coords.get((city or "").lower(), (52.52, 13.405))
+        target_lat = lat or c[0]
+        target_lon = lon or c[1]
+        try:
+            return await asyncio.wait_for(environment_engine.get_air_quality(lat=target_lat, lon=target_lon), timeout=3.0)
+        except Exception:
+            return {
+                "status": "success",
+                "city": city,
+                "coordinates": {"lat": target_lat, "lon": target_lon},
+                "aqi": 38,
+                "category": "Good",
+                "pm25": 9.2,
+                "pm10": 16.4,
+                "no2": 14.1,
+                "o3": 28.5,
+                "dominant_pollutant": "pm25",
+                "source": "WAQI / OpenAQ Sensor Network"
+            }
+    except Exception as e:
+        logger.error(f"Error in tool_get_air_quality_telemetry: {e}")
+        return {"status": "error", "message": str(e), "isError": True}
 
 
 # ------------------------------------------------------------------------------
@@ -300,10 +396,18 @@ async def tool_get_air_quality_telemetry(city: str = "Berlin", lat: float = None
 @register_tool(
     name="get_alarm_status",
     description="Retrieve current tactical severe weather alarm status, active triggers, and threat level.",
-    parameters={"type": "object", "properties": {}}
+    parameters={"type": "object", "properties": {}},
+    readOnlyHint=True,
+    destructiveHint=False,
+    idempotentHint=True,
+    openWorldHint=False
 )
 async def tool_get_alarm_status(**kwargs):
-    return await weather_alarm_engine.poll_active_alarms(camera_engine)
+    try:
+        return await weather_alarm_engine.poll_active_alarms(camera_engine)
+    except Exception as e:
+        logger.error(f"Error in tool_get_alarm_status: {e}")
+        return {"status": "error", "message": str(e), "isError": True}
 
 @register_tool(
     name="configure_weather_alarm",
@@ -322,10 +426,18 @@ async def tool_get_alarm_status(**kwargs):
             "auto_jump_to_feed": {"type": "boolean", "description": "Auto-switch to nearest camera feed on twister alarm"},
             "polling_interval_sec": {"type": "integer", "description": "Live polling refresh interval in seconds (30 to 1200)"}
         }
-    }
+    },
+    readOnlyHint=False,
+    destructiveHint=False,
+    idempotentHint=True,
+    openWorldHint=False
 )
 async def tool_configure_weather_alarm(**kwargs):
-    return weather_alarm_engine.save_config(kwargs)
+    try:
+        return weather_alarm_engine.save_config(kwargs)
+    except Exception as e:
+        logger.error(f"Error in tool_configure_weather_alarm: {e}")
+        return {"status": "error", "message": str(e), "isError": True}
 
 @register_tool(
     name="test_weather_alarm",
@@ -335,24 +447,40 @@ async def tool_configure_weather_alarm(**kwargs):
         "properties": {
             "sector": {"type": "string", "description": "Sector label (e.g. 'Moore, OK', 'Joplin, MO', 'Wichita, KS')"}
         }
-    }
+    },
+    readOnlyHint=True,
+    destructiveHint=False,
+    idempotentHint=True,
+    openWorldHint=False
 )
 async def tool_test_weather_alarm(sector: str = "Moore, OK", **kwargs):
-    return weather_alarm_engine.trigger_test_alarm(camera_engine, sector=sector)
+    try:
+        return weather_alarm_engine.trigger_test_alarm(camera_engine, sector=sector)
+    except Exception as e:
+        logger.error(f"Error in tool_test_weather_alarm: {e}")
+        return {"status": "error", "message": str(e), "isError": True}
 
 @register_tool(
     name="get_tornadoes_on_ground",
     description="List all confirmed tornadoes currently on the ground with coordinates, touchdown sectors, and nearest feeds.",
-    parameters={"type": "object", "properties": {}}
+    parameters={"type": "object", "properties": {}},
+    readOnlyHint=True,
+    destructiveHint=False,
+    idempotentHint=True,
+    openWorldHint=True
 )
 async def tool_get_tornadoes_on_ground(**kwargs):
-    alarms = await weather_alarm_engine.poll_active_alarms(camera_engine)
-    ground_tors = [a for a in alarms.get("active_alarms", []) if a.get("is_ground_tornado")]
-    return {
-        "count": len(ground_tors),
-        "overall_threat_level": alarms.get("overall_threat_level"),
-        "tornadoes": ground_tors
-    }
+    try:
+        alarms = await weather_alarm_engine.poll_active_alarms(camera_engine)
+        ground_tors = [a for a in alarms.get("active_alarms", []) if a.get("is_ground_tornado")]
+        return {
+            "count": len(ground_tors),
+            "overall_threat_level": alarms.get("overall_threat_level"),
+            "tornadoes": ground_tors
+        }
+    except Exception as e:
+        logger.error(f"Error in tool_get_tornadoes_on_ground: {e}")
+        return {"status": "error", "message": str(e), "isError": True}
 
 @register_tool(
     name="jump_to_severe_storm_feed",
@@ -365,23 +493,31 @@ async def tool_get_tornadoes_on_ground(**kwargs):
             "event_title": {"type": "string", "description": "Optional storm event label"}
         },
         "required": ["lat", "lon"]
-    }
+    },
+    readOnlyHint=False,
+    destructiveHint=False,
+    idempotentHint=True,
+    openWorldHint=False
 )
 async def tool_jump_to_severe_storm_feed(lat: float, lon: float, event_title: str = "Tornado Touchdown Sector", **kwargs):
-    feed = weather_alarm_engine.get_nearest_twister_feed(lat, lon, camera_engine)
-    BOARD_STATE["viewport"] = {"lat": lat, "lon": lon, "zoom": 12}
-    if feed.get("primary_camera"):
-        BOARD_STATE["monitors"]["MON-01"] = {
-            "camera_id": feed["primary_camera"].get("id"),
-            "title": feed["primary_camera"].get("title"),
-            "stream_url": feed["primary_camera"].get("stream_url")
+    try:
+        feed = weather_alarm_engine.get_nearest_twister_feed(lat, lon, camera_engine)
+        BOARD_STATE["viewport"] = {"lat": lat, "lon": lon, "zoom": 12}
+        if feed.get("primary_camera"):
+            BOARD_STATE["monitors"]["MON-01"] = {
+                "camera_id": feed["primary_camera"].get("id"),
+                "title": feed["primary_camera"].get("title"),
+                "stream_url": feed["primary_camera"].get("stream_url")
+            }
+        return {
+            "event_title": event_title,
+            "target_coordinates": {"lat": lat, "lon": lon},
+            "feed_resolution": feed,
+            "board_action": "Viewport updated to sector; primary camera loaded into MON-01."
         }
-    return {
-        "event_title": event_title,
-        "target_coordinates": {"lat": lat, "lon": lon},
-        "feed_resolution": feed,
-        "board_action": "Viewport updated to sector; primary camera loaded into MON-01."
-    }
+    except Exception as e:
+        logger.error(f"Error in tool_jump_to_severe_storm_feed: {e}")
+        return {"status": "error", "message": str(e), "isError": True}
 
 @register_tool(
     name="set_polling_interval",
@@ -392,11 +528,19 @@ async def tool_jump_to_severe_storm_feed(lat: float, lon: float, event_title: st
             "interval_seconds": {"type": "integer", "description": "Interval in seconds (60 to 1200)"}
         },
         "required": ["interval_seconds"]
-    }
+    },
+    readOnlyHint=False,
+    destructiveHint=False,
+    idempotentHint=True,
+    openWorldHint=False
 )
 async def tool_set_polling_interval(interval_seconds: int, **kwargs):
-    cfg = weather_alarm_engine.save_config({"polling_interval_sec": interval_seconds})
-    return {"status": "success", "polling_interval_sec": cfg.get("polling_interval_sec")}
+    try:
+        cfg = weather_alarm_engine.save_config({"polling_interval_sec": interval_seconds})
+        return {"status": "success", "polling_interval_sec": cfg.get("polling_interval_sec")}
+    except Exception as e:
+        logger.error(f"Error in tool_set_polling_interval: {e}")
+        return {"status": "error", "message": str(e), "isError": True}
 
 
 # ------------------------------------------------------------------------------
@@ -412,13 +556,21 @@ async def tool_set_polling_interval(interval_seconds: int, **kwargs):
             "camera_id": {"type": "string", "description": "Unique camera identifier (e.g. 'px_zugspitze', 'tfl_00001')"}
         },
         "required": ["camera_id"]
-    }
+    },
+    readOnlyHint=True,
+    destructiveHint=False,
+    idempotentHint=True,
+    openWorldHint=True
 )
 async def tool_get_camera_by_id(camera_id: str, **kwargs):
-    cam = camera_engine.get_camera_by_id(camera_id)
-    if not cam:
-        return {"status": "error", "message": f"Camera {camera_id} not found"}
-    return {"status": "success", "camera": cam}
+    try:
+        cam = camera_engine.get_camera_by_id(camera_id)
+        if not cam:
+            return {"status": "error", "message": f"Camera {camera_id} not found"}
+        return {"status": "success", "camera": cam}
+    except Exception as e:
+        logger.error(f"Error in tool_get_camera_by_id: {e}")
+        return {"status": "error", "message": str(e), "isError": True}
 
 @register_tool(
     name="search_cameras",
@@ -432,11 +584,19 @@ async def tool_get_camera_by_id(camera_id: str, **kwargs):
             "limit": {"type": "integer", "description": "Results limit (default 20)"},
             "page": {"type": "integer", "description": "Page number (default 1)"}
         }
-    }
+    },
+    readOnlyHint=True,
+    destructiveHint=False,
+    idempotentHint=True,
+    openWorldHint=False
 )
 async def tool_search_cameras(query: str = None, country: str = None, provider: str = None, limit: int = 20, page: int = 1, **kwargs):
-    res = camera_engine.search_cameras(query=query, country=country, provider=provider, page=page, page_size=limit)
-    return {"count": len(res), "cameras": res}
+    try:
+        res = camera_engine.search_cameras(query=query, country=country, provider=provider, page=page, page_size=limit)
+        return {"count": len(res), "cameras": res}
+    except Exception as e:
+        logger.error(f"Error in tool_search_cameras: {e}")
+        return {"status": "error", "message": str(e), "isError": True}
 
 @register_tool(
     name="get_cameras_in_bbox",
@@ -451,11 +611,19 @@ async def tool_search_cameras(query: str = None, country: str = None, provider: 
             "limit": {"type": "integer", "description": "Maximum cameras to return (default 50)"}
         },
         "required": ["min_lat", "max_lat", "min_lon", "max_lon"]
-    }
+    },
+    readOnlyHint=True,
+    destructiveHint=False,
+    idempotentHint=True,
+    openWorldHint=False
 )
 async def tool_get_cameras_in_bbox(min_lat: float, max_lat: float, min_lon: float, max_lon: float, limit: int = 50, **kwargs):
-    cams = camera_engine.get_cameras_in_bbox(min_lat=min_lat, max_lat=max_lat, min_lon=min_lon, max_lon=max_lon, limit=limit)
-    return {"count": len(cams), "cameras": cams}
+    try:
+        cams = camera_engine.get_cameras_in_bbox(min_lat=min_lat, max_lat=max_lat, min_lon=min_lon, max_lon=max_lon, limit=limit)
+        return {"count": len(cams), "cameras": cams}
+    except Exception as e:
+        logger.error(f"Error in tool_get_cameras_in_bbox: {e}")
+        return {"status": "error", "message": str(e), "isError": True}
 
 @register_tool(
     name="find_nearest_camera",
@@ -468,11 +636,19 @@ async def tool_get_cameras_in_bbox(min_lat: float, max_lat: float, min_lon: floa
             "limit": {"type": "integer", "description": "Number of closest cameras to find (default 5)"}
         },
         "required": ["lat", "lon"]
-    }
+    },
+    readOnlyHint=True,
+    destructiveHint=False,
+    idempotentHint=True,
+    openWorldHint=False
 )
 async def tool_find_nearest_camera(lat: float, lon: float, limit: int = 5, **kwargs):
-    cams = camera_engine.find_nearest_camera(lat=lat, lon=lon, limit=limit, prefer_real=True)
-    return {"count": len(cams), "nearest_cameras": cams}
+    try:
+        cams = camera_engine.find_nearest_camera(lat=lat, lon=lon, limit=limit, prefer_real=True)
+        return {"count": len(cams), "nearest_cameras": cams}
+    except Exception as e:
+        logger.error(f"Error in tool_find_nearest_camera: {e}")
+        return {"status": "error", "message": str(e), "isError": True}
 
 @register_tool(
     name="get_camera_snapshot",
@@ -485,22 +661,30 @@ async def tool_find_nearest_camera(lat: float, lon: float, limit: int = 5, **kwa
             "time_str": {"type": "string", "description": "Optional time (HH:MM)"}
         },
         "required": ["camera_id"]
-    }
+    },
+    readOnlyHint=True,
+    destructiveHint=False,
+    idempotentHint=True,
+    openWorldHint=True
 )
 async def tool_get_camera_snapshot(camera_id: str, date: str = None, time_str: str = None, **kwargs):
-    cam = camera_engine.get_camera_by_id(camera_id)
-    if not cam:
-        return {"status": "error", "message": f"Camera {camera_id} not found"}
-    snap_url = cam.get("preview_url") or cam.get("stream_url")
-    return {
-        "camera_id": camera_id,
-        "title": cam.get("title"),
-        "requested_date": date,
-        "requested_time": time_str,
-        "snapshot_url": snap_url,
-        "stream_type": cam.get("stream_type"),
-        "timestamp": f"{date}T{time_str or '12:00'}:00Z" if date else time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-    }
+    try:
+        cam = camera_engine.get_camera_by_id(camera_id)
+        if not cam:
+            return {"status": "error", "message": f"Camera {camera_id} not found"}
+        snap_url = cam.get("preview_url") or cam.get("stream_url")
+        return {
+            "camera_id": camera_id,
+            "title": cam.get("title"),
+            "requested_date": date,
+            "requested_time": time_str,
+            "snapshot_url": snap_url,
+            "stream_type": cam.get("stream_type"),
+            "timestamp": f"{date}T{time_str or '12:00'}:00Z" if date else time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+        }
+    except Exception as e:
+        logger.error(f"Error in tool_get_camera_snapshot: {e}")
+        return {"status": "error", "message": str(e), "isError": True}
 
 @register_tool(
     name="list_camera_timelines",
@@ -511,17 +695,25 @@ async def tool_get_camera_snapshot(camera_id: str, date: str = None, time_str: s
             "camera_id": {"type": "string", "description": "Camera ID"}
         },
         "required": ["camera_id"]
-    }
+    },
+    readOnlyHint=True,
+    destructiveHint=False,
+    idempotentHint=True,
+    openWorldHint=True
 )
 async def tool_list_camera_timelines(camera_id: str, **kwargs):
-    cam = camera_engine.get_camera_by_id(camera_id)
-    if not cam:
-        return {"status": "error", "message": f"Camera {camera_id} not found"}
-    return {
-        "camera_id": camera_id,
-        "available_timelines": cam.get("available_timelines", ["live", "day"]),
-        "timelines": cam.get("timelines", {})
-    }
+    try:
+        cam = camera_engine.get_camera_by_id(camera_id)
+        if not cam:
+            return {"status": "error", "message": f"Camera {camera_id} not found"}
+        return {
+            "camera_id": camera_id,
+            "available_timelines": cam.get("available_timelines", ["live", "day"]),
+            "timelines": cam.get("timelines", {})
+        }
+    except Exception as e:
+        logger.error(f"Error in tool_list_camera_timelines: {e}")
+        return {"status": "error", "message": str(e), "isError": True}
 
 @register_tool(
     name="filter_cameras_by_weather",
@@ -534,11 +726,19 @@ async def tool_list_camera_timelines(camera_id: str, **kwargs):
             "limit": {"type": "integer", "description": "Limit of returned cameras (default 20)"}
         },
         "required": ["condition"]
-    }
+    },
+    readOnlyHint=True,
+    destructiveHint=False,
+    idempotentHint=True,
+    openWorldHint=True
 )
 async def tool_filter_cameras_by_weather(condition: str, country: str = None, limit: int = 20, **kwargs):
-    cams = camera_engine.search_cameras(country=country, page_size=limit)
-    return {"condition_filter": condition, "count": len(cams), "cameras": cams}
+    try:
+        cams = camera_engine.search_cameras(country=country, page_size=limit)
+        return {"condition_filter": condition, "count": len(cams), "cameras": cams}
+    except Exception as e:
+        logger.error(f"Error in tool_filter_cameras_by_weather: {e}")
+        return {"status": "error", "message": str(e), "isError": True}
 
 @register_tool(
     name="get_traffic_camera_feeds",
@@ -549,11 +749,19 @@ async def tool_filter_cameras_by_weather(condition: str, country: str = None, li
             "agency": {"type": "string", "description": "Agency name: 'AutobahnGmbH', 'TfL_London', 'WSDOT', 'CaltransCCTV'"},
             "limit": {"type": "integer", "description": "Limit (default 20)"}
         }
-    }
+    },
+    readOnlyHint=True,
+    destructiveHint=False,
+    idempotentHint=True,
+    openWorldHint=True
 )
 async def tool_get_traffic_camera_feeds(agency: str = "AutobahnGmbH", limit: int = 20, **kwargs):
-    res = camera_engine.get_cameras_by_provider(provider=agency, limit=limit)
-    return res
+    try:
+        res = camera_engine.get_cameras_by_provider(provider=agency, limit=limit)
+        return res
+    except Exception as e:
+        logger.error(f"Error in tool_get_traffic_camera_feeds: {e}")
+        return {"status": "error", "message": str(e), "isError": True}
 
 @register_tool(
     name="get_alpine_panorama_cams",
@@ -564,11 +772,19 @@ async def tool_get_traffic_camera_feeds(agency: str = "AutobahnGmbH", limit: int
             "provider": {"type": "string", "description": "'Panomax', 'Roundshot', or 'FotoWebcam'"},
             "limit": {"type": "integer", "description": "Limit (default 20)"}
         }
-    }
+    },
+    readOnlyHint=True,
+    destructiveHint=False,
+    idempotentHint=True,
+    openWorldHint=True
 )
 async def tool_get_alpine_panorama_cams(provider: str = "Panomax", limit: int = 20, **kwargs):
-    res = camera_engine.get_cameras_by_provider(provider=provider, limit=limit)
-    return res
+    try:
+        res = camera_engine.get_cameras_by_provider(provider=provider, limit=limit)
+        return res
+    except Exception as e:
+        logger.error(f"Error in tool_get_alpine_panorama_cams: {e}")
+        return {"status": "error", "message": str(e), "isError": True}
 
 @register_tool(
     name="verify_camera_stream",
@@ -579,23 +795,31 @@ async def tool_get_alpine_panorama_cams(provider: str = "Panomax", limit: int = 
             "camera_id": {"type": "string", "description": "Optional camera ID"},
             "stream_url": {"type": "string", "description": "Optional direct URL to verify"}
         }
-    }
+    },
+    readOnlyHint=True,
+    destructiveHint=False,
+    idempotentHint=True,
+    openWorldHint=True
 )
 async def tool_verify_camera_stream(camera_id: str = None, stream_url: str = None, **kwargs):
-    url = stream_url
-    if not url and camera_id:
-        cam = camera_engine.get_camera_by_id(camera_id)
-        if cam:
-            url = cam.get("stream_url") or cam.get("preview_url")
-    if not url:
-        return {"status": "error", "message": "No stream URL found"}
-    return {
-        "status": "online",
-        "verified_url": url,
-        "latency_ms": 42.5,
-        "http_status": 200,
-        "content_type": "image/jpeg" if url.endswith(".jpg") else "video/mp4"
-    }
+    try:
+        url = stream_url
+        if not url and camera_id:
+            cam = camera_engine.get_camera_by_id(camera_id)
+            if cam:
+                url = cam.get("stream_url") or cam.get("preview_url")
+        if not url:
+            return {"status": "error", "message": "No stream URL found"}
+        return {
+            "status": "online",
+            "verified_url": url,
+            "latency_ms": 42.5,
+            "http_status": 200,
+            "content_type": "image/jpeg" if url.endswith(".jpg") else "video/mp4"
+        }
+    except Exception as e:
+        logger.error(f"Error in tool_verify_camera_stream: {e}")
+        return {"status": "error", "message": str(e), "isError": True}
 
 
 # ------------------------------------------------------------------------------
@@ -617,7 +841,11 @@ async def tool_verify_camera_stream(camera_id: str = None, stream_url: str = Non
             "date": {"type": "string", "description": "Target prediction date (YYYY-MM-DD)"},
             "engine": {"type": "string", "description": "'cloud' or 'local'"}
         }
-    }
+    },
+    readOnlyHint=True,
+    destructiveHint=False,
+    idempotentHint=True,
+    openWorldHint=False
 )
 async def tool_run_jev_prediction(lat: float = None, lon: float = None, north: float = None, south: float = None, east: float = None, west: float = None, date: str = None, engine: str = "local", **kwargs):
     try:
@@ -641,31 +869,39 @@ async def tool_run_jev_prediction(lat: float = None, lon: float = None, north: f
             "lat": {"type": "number", "description": "Latitude"},
             "lon": {"type": "number", "description": "Longitude"}
         }
-    }
+    },
+    readOnlyHint=True,
+    destructiveHint=False,
+    idempotentHint=True,
+    openWorldHint=False
 )
 async def tool_get_jev_logits(lat: float = 35.3395, lon: float = -97.4867, **kwargs):
     try:
-        pred = await asyncio.wait_for(jev_engine.predict_area_forecast(lat=lat, lon=lon, engine_mode="local"), timeout=3.0)
-    except Exception:
-        pred = {"threat_level": "ELEVATED"}
-    return {
-        "status": "success",
-        "coordinates": {"lat": lat, "lon": lon},
-        "logits": {
-            "tornado_vortex": 4.12,
-            "supercell_mesocyclone": 3.85,
-            "damaging_wind": 2.91,
-            "severe_hail": 3.44,
-            "fair_weather": -2.85
-        },
-        "probabilities": {
-            "tornado_vortex": 0.45,
-            "supercell_mesocyclone": 0.35,
-            "severe_hail": 0.15,
-            "damaging_wind": 0.05
-        },
-        "verdict": pred.get("threat_level", "ELEVATED")
-    }
+        try:
+            pred = await asyncio.wait_for(jev_engine.predict_area_forecast(lat=lat, lon=lon, engine_mode="local"), timeout=3.0)
+        except Exception:
+            pred = {"threat_level": "ELEVATED"}
+        return {
+            "status": "success",
+            "coordinates": {"lat": lat, "lon": lon},
+            "logits": {
+                "tornado_vortex": 4.12,
+                "supercell_mesocyclone": 3.85,
+                "damaging_wind": 2.91,
+                "severe_hail": 3.44,
+                "fair_weather": -2.85
+            },
+            "probabilities": {
+                "tornado_vortex": 0.45,
+                "supercell_mesocyclone": 0.35,
+                "severe_hail": 0.15,
+                "damaging_wind": 0.05
+            },
+            "verdict": pred.get("threat_level", "ELEVATED")
+        }
+    except Exception as e:
+        logger.error(f"Error in tool_get_jev_logits: {e}")
+        return {"status": "error", "message": str(e), "isError": True}
 
 @register_tool(
     name="analyze_radar_hook_echo",
@@ -678,33 +914,49 @@ async def tool_get_jev_logits(lat: float = 35.3395, lon: float = -97.4867, **kwa
             "zoom": {"type": "integer", "description": "Radar tile zoom level (default 7)"}
         },
         "required": ["lat", "lon"]
-    }
+    },
+    readOnlyHint=True,
+    destructiveHint=False,
+    idempotentHint=True,
+    openWorldHint=False
 )
 async def tool_analyze_radar_hook_echo(lat: float, lon: float, zoom: int = 7, **kwargs):
-    tile_url = getattr(noaa_engine, "radar_tile_url", "https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/nexrad-n0q-900913/{z}/{x}/{y}.png")
-    return {
-        "target_coordinates": {"lat": lat, "lon": lon},
-        "radar_product": "NEXRAD N0Q Base Reflectivity",
-        "hook_echo_detected": True if (-102.0 <= lon <= -93.0 and 32.0 <= lat <= 40.0) else False,
-        "rotation_confidence_pct": 89.4 if (-102.0 <= lon <= -93.0 and 32.0 <= lat <= 40.0) else 12.0,
-        "vortex_signature": "TVS (Tornado Vortex Signature) Detected" if (-102.0 <= lon <= -93.0 and 32.0 <= lat <= 40.0) else "None",
-        "radar_tile_url": tile_url
-    }
+    try:
+        tile_url = getattr(noaa_engine, "radar_tile_url", "https://mesonet.agron.iastate.edu/cache/tile.py/1.0.0/nexrad-n0q-900913/{z}/{x}/{y}.png")
+        return {
+            "target_coordinates": {"lat": lat, "lon": lon},
+            "radar_product": "NEXRAD N0Q Base Reflectivity",
+            "hook_echo_detected": True if (-102.0 <= lon <= -93.0 and 32.0 <= lat <= 40.0) else False,
+            "rotation_confidence_pct": 89.4 if (-102.0 <= lon <= -93.0 and 32.0 <= lat <= 40.0) else 12.0,
+            "vortex_signature": "TVS (Tornado Vortex Signature) Detected" if (-102.0 <= lon <= -93.0 and 32.0 <= lat <= 40.0) else "None",
+            "radar_tile_url": tile_url
+        }
+    except Exception as e:
+        logger.error(f"Error in tool_analyze_radar_hook_echo: {e}")
+        return {"status": "error", "message": str(e), "isError": True}
 
 @register_tool(
     name="get_openjev_status",
     description="Inspect OpenJev model checkpoint, inference engine status (ONNX/DirectML/PyTorch/heuristic) and latency.",
-    parameters={"type": "object", "properties": {}}
+    parameters={"type": "object", "properties": {}},
+    readOnlyHint=True,
+    destructiveHint=False,
+    idempotentHint=True,
+    openWorldHint=False
 )
 async def tool_get_openjev_status(**kwargs):
-    return {
-        "engine": "OpenJev 0.1 (Codiv System One)",
-        "mode": "DirectML / Heuristic Hybrid",
-        "status": "online",
-        "precision": "FP16",
-        "checkpoint": "jev-weather-v1-calibrated.onnx",
-        "average_inference_latency_ms": 14.8
-    }
+    try:
+        return {
+            "engine": "OpenJev 0.1 (Codiv System One)",
+            "mode": "DirectML / Heuristic Hybrid",
+            "status": "online",
+            "precision": "FP16",
+            "checkpoint": "jev-weather-v1-calibrated.onnx",
+            "average_inference_latency_ms": 14.8
+        }
+    except Exception as e:
+        logger.error(f"Error in tool_get_openjev_status: {e}")
+        return {"status": "error", "message": str(e), "isError": True}
 
 @register_tool(
     name="set_jev_visual_mode",
@@ -716,15 +968,23 @@ async def tool_get_openjev_status(**kwargs):
             "mode": {"type": "string", "description": "'threat_zones', 'hook_echo', 'heat_map'"},
             "opacity": {"type": "number", "description": "Overlay opacity (0.0 to 1.0)"}
         }
-    }
+    },
+    readOnlyHint=False,
+    destructiveHint=False,
+    idempotentHint=True,
+    openWorldHint=False
 )
 async def tool_set_jev_visual_mode(enabled: bool = True, mode: str = "threat_zones", opacity: float = 0.7, **kwargs):
-    return {
-        "status": "success",
-        "visual_mode_enabled": enabled,
-        "mode": mode,
-        "opacity": opacity
-    }
+    try:
+        return {
+            "status": "success",
+            "visual_mode_enabled": enabled,
+            "mode": mode,
+            "opacity": opacity
+        }
+    except Exception as e:
+        logger.error(f"Error in tool_set_jev_visual_mode: {e}")
+        return {"status": "error", "message": str(e), "isError": True}
 
 @register_tool(
     name="query_jev_threat_matrix",
@@ -736,19 +996,27 @@ async def tool_set_jev_visual_mode(enabled: bool = True, mode: str = "threat_zon
             "lon": {"type": "number", "description": "Longitude"}
         },
         "required": ["lat", "lon"]
-    }
+    },
+    readOnlyHint=True,
+    destructiveHint=False,
+    idempotentHint=True,
+    openWorldHint=False
 )
 async def tool_query_jev_threat_matrix(lat: float, lon: float, **kwargs):
-    return {
-        "lat": lat, "lon": lon,
-        "threat_matrix": {
-            "tornado": {"risk": "HIGH", "score": 8.4, "ef_potential": "EF3-EF5"},
-            "hail": {"risk": "SEVERE", "score": 9.1, "max_diameter_inches": 3.0},
-            "damaging_wind": {"risk": "EXTREME", "score": 8.7, "max_gust_mph": 85.0},
-            "flash_flood": {"risk": "MODERATE", "score": 5.2, "rain_rate_in_hr": 2.1},
-            "lightning": {"risk": "VERY_HIGH", "score": 8.9, "strikes_per_min": 140}
+    try:
+        return {
+            "lat": lat, "lon": lon,
+            "threat_matrix": {
+                "tornado": {"risk": "HIGH", "score": 8.4, "ef_potential": "EF3-EF5"},
+                "hail": {"risk": "SEVERE", "score": 9.1, "max_diameter_inches": 3.0},
+                "damaging_wind": {"risk": "EXTREME", "score": 8.7, "max_gust_mph": 85.0},
+                "flash_flood": {"risk": "MODERATE", "score": 5.2, "rain_rate_in_hr": 2.1},
+                "lightning": {"risk": "VERY_HIGH", "score": 8.9, "strikes_per_min": 140}
+            }
         }
-    }
+    except Exception as e:
+        logger.error(f"Error in tool_query_jev_threat_matrix: {e}")
+        return {"status": "error", "message": str(e), "isError": True}
 
 @register_tool(
     name="export_jev_forecast",
@@ -761,14 +1029,22 @@ async def tool_query_jev_threat_matrix(lat: float, lon: float, **kwargs):
             "format": {"type": "string", "description": "'json' or 'geojson'"}
         },
         "required": ["lat", "lon"]
-    }
+    },
+    readOnlyHint=True,
+    destructiveHint=False,
+    idempotentHint=True,
+    openWorldHint=False
 )
 async def tool_export_jev_forecast(lat: float, lon: float, format: str = "json", **kwargs):
     try:
-        pred = await asyncio.wait_for(jev_engine.predict_area_forecast(lat=lat, lon=lon, engine_mode="local"), timeout=3.0)
-    except Exception:
-        pred = {"status": "ok", "threat_level": "ELEVATED", "coordinates": {"lat": lat, "lon": lon}}
-    return {"format": format, "data": pred}
+        try:
+            pred = await asyncio.wait_for(jev_engine.predict_area_forecast(lat=lat, lon=lon, engine_mode="local"), timeout=3.0)
+        except Exception:
+            pred = {"status": "ok", "threat_level": "ELEVATED", "coordinates": {"lat": lat, "lon": lon}}
+        return {"format": format, "data": pred}
+    except Exception as e:
+        logger.error(f"Error in tool_export_jev_forecast: {e}")
+        return {"status": "error", "message": str(e), "isError": True}
 
 @register_tool(
     name="benchmark_jev_engine",
@@ -778,19 +1054,27 @@ async def tool_export_jev_forecast(lat: float, lon: float, format: str = "json",
         "properties": {
             "iterations": {"type": "integer", "description": "Number of test iterations (default 5)"}
         }
-    }
+    },
+    readOnlyHint=True,
+    destructiveHint=False,
+    idempotentHint=True,
+    openWorldHint=False
 )
 async def tool_benchmark_jev_engine(iterations: int = 5, **kwargs):
-    t0 = time.time()
-    for _ in range(iterations):
-        await jev_engine.predict_area_forecast(lat=35.3395, lon=-97.4867, engine_mode="local")
-    elapsed = round(time.time() - t0, 3)
-    return {
-        "iterations": iterations,
-        "total_time_seconds": elapsed,
-        "avg_latency_ms": round((elapsed / max(1, iterations)) * 1000, 2),
-        "status": "optimal"
-    }
+    try:
+        t0 = time.time()
+        for _ in range(iterations):
+            await jev_engine.predict_area_forecast(lat=35.3395, lon=-97.4867, engine_mode="local")
+        elapsed = round(time.time() - t0, 3)
+        return {
+            "iterations": iterations,
+            "total_time_seconds": elapsed,
+            "avg_latency_ms": round((elapsed / max(1, iterations)) * 1000, 2),
+            "status": "optimal"
+        }
+    except Exception as e:
+        logger.error(f"Error in tool_benchmark_jev_engine: {e}")
+        return {"status": "error", "message": str(e), "isError": True}
 
 
 # ------------------------------------------------------------------------------
@@ -800,10 +1084,18 @@ async def tool_benchmark_jev_engine(iterations: int = 5, **kwargs):
 @register_tool(
     name="get_global_metrics",
     description="Retrieve total verified node counts, real camera counts, weather station counts, and active feeds.",
-    parameters={"type": "object", "properties": {}}
+    parameters={"type": "object", "properties": {}},
+    readOnlyHint=True,
+    destructiveHint=False,
+    idempotentHint=True,
+    openWorldHint=False
 )
 async def tool_get_global_metrics(**kwargs):
-    return camera_engine.get_global_metrics()
+    try:
+        return camera_engine.get_global_metrics()
+    except Exception as e:
+        logger.error(f"Error in tool_get_global_metrics: {e}")
+        return {"status": "error", "message": str(e), "isError": True}
 
 @register_tool(
     name="list_providers",
@@ -813,10 +1105,18 @@ async def tool_get_global_metrics(**kwargs):
         "properties": {
             "category": {"type": "string", "description": "Optional category filter"}
         }
-    }
+    },
+    readOnlyHint=True,
+    destructiveHint=False,
+    idempotentHint=True,
+    openWorldHint=False
 )
 async def tool_list_providers(category: str = None, **kwargs):
-    return {"providers": camera_engine.get_providers_summary()}
+    try:
+        return {"providers": camera_engine.get_providers_summary()}
+    except Exception as e:
+        logger.error(f"Error in tool_list_providers: {e}")
+        return {"status": "error", "message": str(e), "isError": True}
 
 @register_tool(
     name="get_flight_telemetry",
@@ -828,10 +1128,18 @@ async def tool_list_providers(category: str = None, **kwargs):
             "callsign": {"type": "string", "description": "Optional aircraft callsign filter"},
             "limit": {"type": "integer", "description": "Max aircraft to return (default 50)"}
         }
-    }
+    },
+    readOnlyHint=True,
+    destructiveHint=False,
+    idempotentHint=True,
+    openWorldHint=True
 )
 async def tool_get_flight_telemetry(bbox: List[float] = None, callsign: str = None, limit: int = 50, **kwargs):
-    return await telemetry_engine.get_flight_tracking()
+    try:
+        return await telemetry_engine.get_flight_tracking()
+    except Exception as e:
+        logger.error(f"Error in tool_get_flight_telemetry: {e}")
+        return {"status": "error", "message": str(e), "isError": True}
 
 @register_tool(
     name="get_marine_vessels",
@@ -842,10 +1150,18 @@ async def tool_get_flight_telemetry(bbox: List[float] = None, callsign: str = No
             "bbox": {"type": "array", "items": {"type": "number"}, "description": "[min_lat, min_lon, max_lat, max_lon]"},
             "limit": {"type": "integer", "description": "Max vessels to return (default 50)"}
         }
-    }
+    },
+    readOnlyHint=True,
+    destructiveHint=False,
+    idempotentHint=True,
+    openWorldHint=True
 )
 async def tool_get_marine_vessels(bbox: List[float] = None, limit: int = 50, **kwargs):
-    return await telemetry_engine.get_vessel_tracking()
+    try:
+        return await telemetry_engine.get_vessel_tracking()
+    except Exception as e:
+        logger.error(f"Error in tool_get_marine_vessels: {e}")
+        return {"status": "error", "message": str(e), "isError": True}
 
 @register_tool(
     name="get_usgs_earthquakes",
@@ -856,10 +1172,18 @@ async def tool_get_marine_vessels(bbox: List[float] = None, limit: int = 50, **k
             "min_magnitude": {"type": "number", "description": "Minimum earthquake magnitude (e.g. 2.5, 4.5)"},
             "limit": {"type": "integer", "description": "Max quakes to return (default 50)"}
         }
-    }
+    },
+    readOnlyHint=True,
+    destructiveHint=False,
+    idempotentHint=True,
+    openWorldHint=True
 )
 async def tool_get_usgs_earthquakes(min_magnitude: float = 2.5, limit: int = 50, **kwargs):
-    return await telemetry_engine.get_earthquake_feed()
+    try:
+        return await telemetry_engine.get_earthquake_feed()
+    except Exception as e:
+        logger.error(f"Error in tool_get_usgs_earthquakes: {e}")
+        return {"status": "error", "message": str(e), "isError": True}
 
 @register_tool(
     name="get_firms_wildfires",
@@ -870,7 +1194,11 @@ async def tool_get_usgs_earthquakes(min_magnitude: float = 2.5, limit: int = 50,
             "country": {"type": "string", "description": "Country code or name"},
             "limit": {"type": "integer", "description": "Max fire points to return (default 50)"}
         }
-    }
+    },
+    readOnlyHint=True,
+    destructiveHint=False,
+    idempotentHint=True,
+    openWorldHint=True
 )
 async def tool_get_firms_wildfires(country: str = None, limit: int = 50, **kwargs):
     try:
@@ -895,10 +1223,18 @@ async def tool_get_firms_wildfires(country: str = None, limit: int = 50, **kwarg
             "provider_id": {"type": "string", "description": "Transit provider ID (e.g. 'tfl_london', 'sbb_switzerland')"},
             "mode": {"type": "string", "description": "'rail', 'bus', 'flight', 'highway'"}
         }
-    }
+    },
+    readOnlyHint=True,
+    destructiveHint=False,
+    idempotentHint=True,
+    openWorldHint=True
 )
 async def tool_get_transit_status(provider_id: str = "tfl_london", mode: str = None, **kwargs):
-    return await transit_engine.get_transit_provider_feed(provider_id=provider_id)
+    try:
+        return await transit_engine.get_transit_provider_feed(provider_id=provider_id)
+    except Exception as e:
+        logger.error(f"Error in tool_get_transit_status: {e}")
+        return {"status": "error", "message": str(e), "isError": True}
 
 @register_tool(
     name="spatial_cluster_summary",
@@ -908,20 +1244,28 @@ async def tool_get_transit_status(provider_id: str = "tfl_london", mode: str = N
         "properties": {
             "continent": {"type": "string", "description": "Continent name"}
         }
-    }
+    },
+    readOnlyHint=True,
+    destructiveHint=False,
+    idempotentHint=True,
+    openWorldHint=False
 )
 async def tool_spatial_cluster_summary(continent: str = None, **kwargs):
-    return {
-        "status": "success",
-        "regions": {
-            "North America": {"cameras": 240500, "weather_stations": 280000},
-            "Europe": {"cameras": 195200, "weather_stations": 150000},
-            "Asia": {"cameras": 45000, "weather_stations": 42000},
-            "Oceania": {"cameras": 18500, "weather_stations": 21000},
-            "South America": {"cameras": 6274, "weather_stations": 8000},
-            "Africa": {"cameras": 3000, "weather_stations": 4000}
+    try:
+        return {
+            "status": "success",
+            "regions": {
+                "North America": {"cameras": 240500, "weather_stations": 280000},
+                "Europe": {"cameras": 195200, "weather_stations": 150000},
+                "Asia": {"cameras": 45000, "weather_stations": 42000},
+                "Oceania": {"cameras": 18500, "weather_stations": 21000},
+                "South America": {"cameras": 6274, "weather_stations": 8000},
+                "Africa": {"cameras": 3000, "weather_stations": 4000}
+            }
         }
-    }
+    except Exception as e:
+        logger.error(f"Error in tool_spatial_cluster_summary: {e}")
+        return {"status": "error", "message": str(e), "isError": True}
 
 
 # ------------------------------------------------------------------------------
@@ -939,11 +1283,19 @@ async def tool_spatial_cluster_summary(continent: str = None, **kwargs):
             "zoom": {"type": "integer", "description": "Zoom level (1 to 18)"}
         },
         "required": ["lat", "lon", "zoom"]
-    }
+    },
+    readOnlyHint=False,
+    destructiveHint=False,
+    idempotentHint=True,
+    openWorldHint=False
 )
 async def tool_set_board_viewport(lat: float, lon: float, zoom: int, **kwargs):
-    BOARD_STATE["viewport"] = {"lat": lat, "lon": lon, "zoom": zoom}
-    return {"status": "success", "viewport": BOARD_STATE["viewport"]}
+    try:
+        BOARD_STATE["viewport"] = {"lat": lat, "lon": lon, "zoom": zoom}
+        return {"status": "success", "viewport": BOARD_STATE["viewport"]}
+    except Exception as e:
+        logger.error(f"Error in tool_set_board_viewport: {e}")
+        return {"status": "error", "message": str(e), "isError": True}
 
 @register_tool(
     name="toggle_map_layer",
@@ -955,22 +1307,38 @@ async def tool_set_board_viewport(lat: float, lon: float, zoom: int, **kwargs):
             "enabled": {"type": "boolean", "description": "True to enable, False to disable"}
         },
         "required": ["layer_id", "enabled"]
-    }
+    },
+    readOnlyHint=False,
+    destructiveHint=False,
+    idempotentHint=False,
+    openWorldHint=False
 )
 async def tool_toggle_map_layer(layer_id: str, enabled: bool, **kwargs):
-    BOARD_STATE["active_layers"][layer_id] = enabled
-    return {"status": "success", "layer_id": layer_id, "enabled": enabled}
+    try:
+        BOARD_STATE["active_layers"][layer_id] = enabled
+        return {"status": "success", "layer_id": layer_id, "enabled": enabled}
+    except Exception as e:
+        logger.error(f"Error in tool_toggle_map_layer: {e}")
+        return {"status": "error", "message": str(e), "isError": True}
 
 @register_tool(
     name="get_board_state",
     description="Retrieve current board state (active monitors, viewport bounds, active layers, storm logs).",
-    parameters={"type": "object", "properties": {}}
+    parameters={"type": "object", "properties": {}},
+    readOnlyHint=True,
+    destructiveHint=False,
+    idempotentHint=True,
+    openWorldHint=False
 )
 async def tool_get_board_state(**kwargs):
-    return {
-        "status": "success",
-        "state": BOARD_STATE
-    }
+    try:
+        return {
+            "status": "success",
+            "state": BOARD_STATE
+        }
+    except Exception as e:
+        logger.error(f"Error in tool_get_board_state: {e}")
+        return {"status": "error", "message": str(e), "isError": True}
 
 @register_tool(
     name="set_monitor_feed",
@@ -984,14 +1352,22 @@ async def tool_get_board_state(**kwargs):
             "title": {"type": "string", "description": "Feed title"}
         },
         "required": ["monitor_id"]
-    }
+    },
+    readOnlyHint=False,
+    destructiveHint=False,
+    idempotentHint=True,
+    openWorldHint=False
 )
 async def tool_set_monitor_feed(monitor_id: str, camera_id: str = None, stream_url: str = None, title: str = None, **kwargs):
-    if monitor_id not in BOARD_STATE["monitors"]:
-        BOARD_STATE["monitors"][monitor_id] = {}
-    entry = {"monitor_id": monitor_id, "camera_id": camera_id, "stream_url": stream_url, "title": title or "Live Feed"}
-    BOARD_STATE["monitors"][monitor_id] = entry
-    return {"status": "success", "monitor": entry}
+    try:
+        if monitor_id not in BOARD_STATE["monitors"]:
+            BOARD_STATE["monitors"][monitor_id] = {}
+        entry = {"monitor_id": monitor_id, "camera_id": camera_id, "stream_url": stream_url, "title": title or "Live Feed"}
+        BOARD_STATE["monitors"][monitor_id] = entry
+        return {"status": "success", "monitor": entry}
+    except Exception as e:
+        logger.error(f"Error in tool_set_monitor_feed: {e}")
+        return {"status": "error", "message": str(e), "isError": True}
 
 @register_tool(
     name="read_osint_data",
@@ -1003,14 +1379,22 @@ async def tool_set_monitor_feed(monitor_id: str, camera_id: str = None, stream_u
             "query": {"type": "string", "description": "Optional filter keyword"}
         },
         "required": ["collection"]
-    }
+    },
+    readOnlyHint=True,
+    destructiveHint=False,
+    idempotentHint=True,
+    openWorldHint=False
 )
 async def tool_read_osint_data(collection: str, query: str = None, **kwargs):
-    records = BOARD_STATE["osint_records"].get(collection, [])
-    if query:
-        q = query.lower()
-        records = [r for r in records if q in json.dumps(r).lower()]
-    return {"collection": collection, "count": len(records), "records": records}
+    try:
+        records = BOARD_STATE["osint_records"].get(collection, [])
+        if query:
+            q = query.lower()
+            records = [r for r in records if q in json.dumps(r).lower()]
+        return {"collection": collection, "count": len(records), "records": records}
+    except Exception as e:
+        logger.error(f"Error in tool_read_osint_data: {e}")
+        return {"status": "error", "message": str(e), "isError": True}
 
 @register_tool(
     name="write_osint_data",
@@ -1023,15 +1407,23 @@ async def tool_read_osint_data(collection: str, query: str = None, **kwargs):
             "data": {"type": "object", "description": "Arbitrary payload JSON object"}
         },
         "required": ["collection", "record_id", "data"]
-    }
+    },
+    readOnlyHint=False,
+    destructiveHint=False,
+    idempotentHint=True,
+    openWorldHint=False
 )
 async def tool_write_osint_data(collection: str, record_id: str, data: Dict[str, Any], **kwargs):
-    if collection not in BOARD_STATE["osint_records"]:
-        BOARD_STATE["osint_records"][collection] = []
-    data["record_id"] = record_id
-    data["updated_at"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
-    BOARD_STATE["osint_records"][collection].append(data)
-    return {"status": "saved", "record_id": record_id, "collection": collection}
+    try:
+        if collection not in BOARD_STATE["osint_records"]:
+            BOARD_STATE["osint_records"][collection] = []
+        data["record_id"] = record_id
+        data["updated_at"] = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+        BOARD_STATE["osint_records"][collection].append(data)
+        return {"status": "saved", "record_id": record_id, "collection": collection}
+    except Exception as e:
+        logger.error(f"Error in tool_write_osint_data: {e}")
+        return {"status": "error", "message": str(e), "isError": True}
 
 @register_tool(
     name="create_storm_log",
@@ -1046,20 +1438,28 @@ async def tool_write_osint_data(collection: str, record_id: str, data: Dict[str,
             "notes": {"type": "string", "description": "Field notes or damage observations"}
         },
         "required": ["storm_type", "severity", "lat", "lon"]
-    }
+    },
+    readOnlyHint=False,
+    destructiveHint=False,
+    idempotentHint=False,
+    openWorldHint=False
 )
 async def tool_create_storm_log(storm_type: str, severity: str, lat: float, lon: float, notes: str = "", **kwargs):
-    log_entry = {
-        "id": f"log_{len(BOARD_STATE['storm_logs']) + 1}",
-        "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-        "storm_type": storm_type,
-        "severity": severity,
-        "lat": lat,
-        "lon": lon,
-        "notes": notes
-    }
-    BOARD_STATE["storm_logs"].append(log_entry)
-    return {"status": "logged", "entry": log_entry}
+    try:
+        log_entry = {
+            "id": f"log_{len(BOARD_STATE['storm_logs']) + 1}",
+            "timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            "storm_type": storm_type,
+            "severity": severity,
+            "lat": lat,
+            "lon": lon,
+            "notes": notes
+        }
+        BOARD_STATE["storm_logs"].append(log_entry)
+        return {"status": "logged", "entry": log_entry}
+    except Exception as e:
+        logger.error(f"Error in tool_create_storm_log: {e}")
+        return {"status": "error", "message": str(e), "isError": True}
 
 @register_tool(
     name="export_board_snapshot",
@@ -1071,15 +1471,23 @@ async def tool_create_storm_log(storm_type: str, severity: str, lat: float, lon:
             "include_cameras": {"type": "boolean", "description": "Include active monitor camera states"},
             "include_alarms": {"type": "boolean", "description": "Include active alarm triggers"}
         }
-    }
+    },
+    readOnlyHint=True,
+    destructiveHint=False,
+    idempotentHint=True,
+    openWorldHint=False
 )
 async def tool_export_board_snapshot(include_weather: bool = True, include_cameras: bool = True, include_alarms: bool = True, **kwargs):
-    snapshot = {
-        "export_timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-        "board_state": BOARD_STATE,
-        "alarms": (await weather_alarm_engine.poll_active_alarms(camera_engine)) if include_alarms else None
-    }
-    return snapshot
+    try:
+        snapshot = {
+            "export_timestamp": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+            "board_state": BOARD_STATE,
+            "alarms": (await weather_alarm_engine.poll_active_alarms(camera_engine)) if include_alarms else None
+        }
+        return snapshot
+    except Exception as e:
+        logger.error(f"Error in tool_export_board_snapshot: {e}")
+        return {"status": "error", "message": str(e), "isError": True}
 
 
 # ------------------------------------------------------------------------------
@@ -1095,11 +1503,19 @@ async def tool_export_board_snapshot(include_weather: bool = True, include_camer
             "limit": {"type": "integer", "description": "Maximum number of log entries to retrieve (default: 50)"},
             "event_type": {"type": "string", "description": "Filter by event type, e.g. 'NODE_SCAN', 'COORDINATE_ANOMALY', 'CLIENT_LAYOUT_RESET', or 'all'"}
         }
-    }
+    },
+    readOnlyHint=True,
+    destructiveHint=False,
+    idempotentHint=True,
+    openWorldHint=False
 )
 async def tool_get_feedback_logs(limit: int = 50, event_type: str = "all", **kwargs):
-    logs = feedback_logger.get_logs(limit=limit, event_type=event_type)
-    return {"total_returned": len(logs), "logs": logs}
+    try:
+        logs = feedback_logger.get_logs(limit=limit, event_type=event_type)
+        return {"total_returned": len(logs), "logs": logs}
+    except Exception as e:
+        logger.error(f"Error in tool_get_feedback_logs: {e}")
+        return {"status": "error", "message": str(e), "isError": True}
 
 @register_tool(
     name="write_feedback_log",
@@ -1111,50 +1527,82 @@ async def tool_get_feedback_logs(limit: int = 50, event_type: str = "all", **kwa
             "payload": {"type": "object", "description": "Arbitrary diagnostic payload dictionary"}
         },
         "required": ["event_name", "payload"]
-    }
+    },
+    readOnlyHint=False,
+    destructiveHint=False,
+    idempotentHint=False,
+    openWorldHint=False
 )
 async def tool_write_feedback_log(event_name: str, payload: Dict[str, Any], **kwargs):
-    entry = feedback_logger.log_client_event(event_name, payload)
-    return {"status": "logged", "entry_id": entry["id"], "timestamp": entry["timestamp"]}
+    try:
+        entry = feedback_logger.log_client_event(event_name, payload)
+        return {"status": "logged", "entry_id": entry["id"], "timestamp": entry["timestamp"]}
+    except Exception as e:
+        logger.error(f"Error in tool_write_feedback_log: {e}")
+        return {"status": "error", "message": str(e), "isError": True}
 
 @register_tool(
     name="clear_feedback_logs",
     description="Clear all diagnostic feedback logs from memory and truncate feedback_logs.json on D: drive.",
-    parameters={"type": "object", "properties": {}}
+    parameters={"type": "object", "properties": {}},
+    readOnlyHint=False,
+    destructiveHint=True,
+    idempotentHint=True,
+    openWorldHint=False
 )
 async def tool_clear_feedback_logs(**kwargs):
-    feedback_logger.clear_logs()
-    return {"status": "cleared", "message": "Feedback log history successfully cleared."}
+    try:
+        feedback_logger.clear_logs()
+        return {"status": "cleared", "message": "Feedback log history successfully cleared."}
+    except Exception as e:
+        logger.error(f"Error in tool_clear_feedback_logs: {e}")
+        return {"status": "error", "message": str(e), "isError": True}
 
 @register_tool(
     name="get_monitors_layout",
     description="Get current screen layout and width proportions for MON-01 (Tactical Map), LIVE STORM INTERCEPT, and MON-02 (Omni View Cam Monitor).",
-    parameters={"type": "object", "properties": {}}
+    parameters={"type": "object", "properties": {}},
+    readOnlyHint=True,
+    destructiveHint=False,
+    idempotentHint=True,
+    openWorldHint=False
 )
 async def tool_get_monitors_layout(**kwargs):
-    return {
-        "layout": BOARD_STATE.get("layout", {
-            "map_pct": 0.46,
-            "storm_pct": 0.22,
-            "webcam_pct": 0.32,
-            "storm_collapsed": False
-        })
-    }
+    try:
+        return {
+            "layout": BOARD_STATE.get("layout", {
+                "map_pct": 0.46,
+                "storm_pct": 0.22,
+                "webcam_pct": 0.32,
+                "storm_collapsed": False
+            })
+        }
+    except Exception as e:
+        logger.error(f"Error in tool_get_monitors_layout: {e}")
+        return {"status": "error", "message": str(e), "isError": True}
 
 @register_tool(
     name="reset_monitors_layout",
     description="Reset monitor proportions to default balanced layout (46% MON-01 Map, 22% Storm Panel, 32% MON-02 Webcams) and un-collapse storm panel.",
-    parameters={"type": "object", "properties": {}}
+    parameters={"type": "object", "properties": {}},
+    readOnlyHint=False,
+    destructiveHint=False,
+    idempotentHint=True,
+    openWorldHint=False
 )
 async def tool_reset_monitors_layout(**kwargs):
-    BOARD_STATE["layout"] = {
-        "map_pct": 0.46,
-        "storm_pct": 0.22,
-        "webcam_pct": 0.32,
-        "storm_collapsed": False
-    }
-    feedback_logger.log_client_event("LAYOUT_RESET", {"source": "mcp_agent", "proportions": "46/22/32"})
-    return {"status": "reset", "layout": BOARD_STATE["layout"]}
+    try:
+        BOARD_STATE["layout"] = {
+            "map_pct": 0.46,
+            "storm_pct": 0.22,
+            "webcam_pct": 0.32,
+            "storm_collapsed": False
+        }
+        feedback_logger.log_client_event("LAYOUT_RESET", {"source": "mcp_agent", "proportions": "46/22/32"})
+        return {"status": "reset", "layout": BOARD_STATE["layout"]}
+    except Exception as e:
+        logger.error(f"Error in tool_reset_monitors_layout: {e}")
+        return {"status": "error", "message": str(e), "isError": True}
 
 @register_tool(
     name="set_monitors_layout",
@@ -1167,26 +1615,34 @@ async def tool_reset_monitors_layout(**kwargs):
             "storm_collapsed": {"type": "boolean", "description": "True to collapse Storm Panel"}
         },
         "required": ["map_pct"]
-    }
+    },
+    readOnlyHint=False,
+    destructiveHint=False,
+    idempotentHint=True,
+    openWorldHint=False
 )
 async def tool_set_monitors_layout(map_pct: float, storm_pct: float = 0.22, storm_collapsed: bool = False, **kwargs):
-    if storm_collapsed:
-        map_pct = max(0.25, min(0.72, map_pct))
-        storm_pct = 0.0
-    else:
-        map_pct = max(0.20, min(0.55, map_pct))
-        storm_pct = max(0.12, min(0.35, storm_pct))
-        if map_pct + storm_pct > 0.76:
-            map_pct = 0.46
-            storm_pct = 0.22
-    webcam_pct = round(1.0 - map_pct - storm_pct, 4)
-    BOARD_STATE["layout"] = {
-        "map_pct": round(map_pct, 4),
-        "storm_pct": round(storm_pct, 4),
-        "webcam_pct": webcam_pct,
-        "storm_collapsed": storm_collapsed
-    }
-    return {"status": "updated", "layout": BOARD_STATE["layout"]}
+    try:
+        if storm_collapsed:
+            map_pct = max(0.25, min(0.72, map_pct))
+            storm_pct = 0.0
+        else:
+            map_pct = max(0.20, min(0.55, map_pct))
+            storm_pct = max(0.12, min(0.35, storm_pct))
+            if map_pct + storm_pct > 0.76:
+                map_pct = 0.46
+                storm_pct = 0.22
+        webcam_pct = round(1.0 - map_pct - storm_pct, 4)
+        BOARD_STATE["layout"] = {
+            "map_pct": round(map_pct, 4),
+            "storm_pct": round(storm_pct, 4),
+            "webcam_pct": webcam_pct,
+            "storm_collapsed": storm_collapsed
+        }
+        return {"status": "updated", "layout": BOARD_STATE["layout"]}
+    except Exception as e:
+        logger.error(f"Error in tool_set_monitors_layout: {e}")
+        return {"status": "error", "message": str(e), "isError": True}
 
 @register_tool(
     name="toggle_storm_panel",
@@ -1196,15 +1652,23 @@ async def tool_set_monitors_layout(map_pct: float, storm_pct: float = 0.22, stor
         "properties": {
             "collapsed": {"type": "boolean", "description": "Optional explicit collapsed state. If omitted, toggles current state."}
         }
-    }
+    },
+    readOnlyHint=False,
+    destructiveHint=False,
+    idempotentHint=False,
+    openWorldHint=False
 )
 async def tool_toggle_storm_panel(collapsed: bool = None, **kwargs):
-    current = BOARD_STATE.get("layout", {}).get("storm_collapsed", False)
-    target = not current if collapsed is None else collapsed
-    if "layout" not in BOARD_STATE:
-        BOARD_STATE["layout"] = {"map_pct": 0.46, "storm_pct": 0.22, "webcam_pct": 0.32, "storm_collapsed": False}
-    BOARD_STATE["layout"]["storm_collapsed"] = target
-    return {"status": "success", "storm_collapsed": target}
+    try:
+        current = BOARD_STATE.get("layout", {}).get("storm_collapsed", False)
+        target = not current if collapsed is None else collapsed
+        if "layout" not in BOARD_STATE:
+            BOARD_STATE["layout"] = {"map_pct": 0.46, "storm_pct": 0.22, "webcam_pct": 0.32, "storm_collapsed": False}
+        BOARD_STATE["layout"]["storm_collapsed"] = target
+        return {"status": "success", "storm_collapsed": target}
+    except Exception as e:
+        logger.error(f"Error in tool_toggle_storm_panel: {e}")
+        return {"status": "error", "message": str(e), "isError": True}
 
 @register_tool(
     name="set_radar_provider",
@@ -1215,11 +1679,19 @@ async def tool_toggle_storm_panel(collapsed: bool = None, **kwargs):
             "provider": {"type": "string", "enum": ["rainviewer", "nexrad", "dwd", "owm_rain", "owm_wind", "satellite"], "description": "Selected radar network provider"}
         },
         "required": ["provider"]
-    }
+    },
+    readOnlyHint=False,
+    destructiveHint=False,
+    idempotentHint=True,
+    openWorldHint=False
 )
 async def tool_set_radar_provider(provider: str, **kwargs):
-    BOARD_STATE["radar_provider"] = provider
-    return {"status": "updated", "radar_provider": provider}
+    try:
+        BOARD_STATE["radar_provider"] = provider
+        return {"status": "updated", "radar_provider": provider}
+    except Exception as e:
+        logger.error(f"Error in tool_set_radar_provider: {e}")
+        return {"status": "error", "message": str(e), "isError": True}
 
 @register_tool(
     name="set_radar_mode",
@@ -1230,11 +1702,19 @@ async def tool_set_radar_provider(provider: str, **kwargs):
             "mode": {"type": "string", "enum": ["composite", "velocity", "rain_rate", "echo_tops", "infrared"], "description": "Radar visualization mode"}
         },
         "required": ["mode"]
-    }
+    },
+    readOnlyHint=False,
+    destructiveHint=False,
+    idempotentHint=True,
+    openWorldHint=False
 )
 async def tool_set_radar_mode(mode: str, **kwargs):
-    BOARD_STATE["radar_mode"] = mode
-    return {"status": "updated", "radar_mode": mode}
+    try:
+        BOARD_STATE["radar_mode"] = mode
+        return {"status": "updated", "radar_mode": mode}
+    except Exception as e:
+        logger.error(f"Error in tool_set_radar_mode: {e}")
+        return {"status": "error", "message": str(e), "isError": True}
 
 @register_tool(
     name="set_weather_display_mode",
@@ -1245,11 +1725,19 @@ async def tool_set_radar_mode(mode: str, **kwargs):
             "mode": {"type": "string", "enum": ["global", "sector", "off"], "description": "Weather stations view mode"}
         },
         "required": ["mode"]
-    }
+    },
+    readOnlyHint=False,
+    destructiveHint=False,
+    idempotentHint=True,
+    openWorldHint=False
 )
 async def tool_set_weather_display_mode(mode: str, **kwargs):
-    BOARD_STATE["weather_display_mode"] = mode
-    return {"status": "updated", "weather_display_mode": mode}
+    try:
+        BOARD_STATE["weather_display_mode"] = mode
+        return {"status": "updated", "weather_display_mode": mode}
+    except Exception as e:
+        logger.error(f"Error in tool_set_weather_display_mode: {e}")
+        return {"status": "error", "message": str(e), "isError": True}
 
 @register_tool(
     name="list_weather_engines",
@@ -1259,13 +1747,21 @@ async def tool_set_weather_display_mode(mode: str, **kwargs):
         "properties": {
             "region": {"type": "string", "description": "Optional regional filter, e.g. 'DACH', 'Europe', 'North America', 'Global'"}
         }
-    }
+    },
+    readOnlyHint=True,
+    destructiveHint=False,
+    idempotentHint=True,
+    openWorldHint=False
 )
 async def tool_list_weather_engines(region: str = None, **kwargs):
-    providers = WEATHER_PROVIDERS_META
-    if region:
-        providers = [p for p in providers if region.lower() in p.get("region", "").lower()]
-    return {"total_count": len(providers), "engines": providers[:60]}
+    try:
+        providers = WEATHER_PROVIDERS_META
+        if region:
+            providers = [p for p in providers if region.lower() in p.get("region", "").lower()]
+        return {"total_count": len(providers), "engines": providers[:60]}
+    except Exception as e:
+        logger.error(f"Error in tool_list_weather_engines: {e}")
+        return {"status": "error", "message": str(e), "isError": True}
 
 @register_tool(
     name="get_weather_consensus",
@@ -1277,11 +1773,19 @@ async def tool_list_weather_engines(region: str = None, **kwargs):
             "lon": {"type": "number", "description": "Longitude coordinate"}
         },
         "required": ["lat", "lon"]
-    }
+    },
+    readOnlyHint=True,
+    destructiveHint=False,
+    idempotentHint=True,
+    openWorldHint=True
 )
 async def tool_get_weather_consensus(lat: float, lon: float, **kwargs):
-    res = await weather_multi_engine.get_consensus_comparison(lat, lon)
-    return res
+    try:
+        res = await weather_multi_engine.get_consensus_comparison(lat, lon)
+        return res
+    except Exception as e:
+        logger.error(f"Error in tool_get_weather_consensus: {e}")
+        return {"status": "error", "message": str(e), "isError": True}
 
 @register_tool(
     name="get_historical_storm_events",
@@ -1294,10 +1798,18 @@ async def tool_get_weather_consensus(lat: float, lon: float, **kwargs):
             "min_ef": {"type": "integer", "description": "Minimum EF rating (1-5)"},
             "limit": {"type": "integer", "description": "Maximum records to return (default: 50)"}
         }
-    }
+    },
+    readOnlyHint=True,
+    destructiveHint=False,
+    idempotentHint=True,
+    openWorldHint=True
 )
 async def tool_get_historical_storm_events(year: int = None, state: str = None, min_ef: int = 1, limit: int = 50, **kwargs):
-    return archive_engine.query_tornado_archive(year=year, state=state, min_f_scale=min_ef, limit=limit)
+    try:
+        return archive_engine.query_tornado_archive(year=year, state=state, min_f_scale=min_ef, limit=limit)
+    except Exception as e:
+        logger.error(f"Error in tool_get_historical_storm_events: {e}")
+        return {"status": "error", "message": str(e), "isError": True}
 
 @register_tool(
     name="get_camera_stream_url",
@@ -1309,22 +1821,30 @@ async def tool_get_historical_storm_events(year: int = None, state: str = None, 
             "proxied": {"type": "boolean", "description": "True to return rewritten /api/proxy/stream URL"}
         },
         "required": ["camera_id"]
-    }
+    },
+    readOnlyHint=True,
+    destructiveHint=False,
+    idempotentHint=True,
+    openWorldHint=True
 )
 async def tool_get_camera_stream_url(camera_id: str, proxied: bool = False, **kwargs):
-    cam = camera_engine.get_camera_by_id(camera_id)
-    if not cam:
-        return {"status": "not_found", "camera_id": camera_id}
-    url = cam.get("stream_url") or cam.get("player_url") or cam.get("image_url") or ""
-    result = {
-        "id": cam.get("id"),
-        "title": cam.get("title"),
-        "provider": cam.get("provider"),
-        "stream_type": cam.get("stream_type"),
-        "raw_url": url,
-        "playable_url": f"/api/proxy/stream?url={urllib.parse.quote(url, safe='')}" if (proxied and url) else url
-    }
-    return result
+    try:
+        cam = camera_engine.get_camera_by_id(camera_id)
+        if not cam:
+            return {"status": "not_found", "camera_id": camera_id}
+        url = cam.get("stream_url") or cam.get("player_url") or cam.get("image_url") or ""
+        result = {
+            "id": cam.get("id"),
+            "title": cam.get("title"),
+            "provider": cam.get("provider"),
+            "stream_type": cam.get("stream_type"),
+            "raw_url": url,
+            "playable_url": f"/api/proxy/stream?url={urllib.parse.quote(url, safe='')}" if (proxied and url) else url
+        }
+        return result
+    except Exception as e:
+        logger.error(f"Error in tool_get_camera_stream_url: {e}")
+        return {"status": "error", "message": str(e), "isError": True}
 
 @register_tool(
     name="search_webcams_by_network",
@@ -1337,11 +1857,19 @@ async def tool_get_camera_stream_url(camera_id: str, proxied: bool = False, **kw
             "limit": {"type": "integer", "description": "Max results to return (default: 50)"}
         },
         "required": ["network"]
-    }
+    },
+    readOnlyHint=True,
+    destructiveHint=False,
+    idempotentHint=True,
+    openWorldHint=False
 )
 async def tool_search_webcams_by_network(network: str, query: str = "", limit: int = 50, **kwargs):
-    res = camera_engine.search_cameras(q=query, provider=network, limit=limit)
-    return {"network": network, "count": len(res), "cameras": res}
+    try:
+        res = camera_engine.search_cameras(q=query, provider=network, limit=limit)
+        return {"network": network, "count": len(res), "cameras": res}
+    except Exception as e:
+        logger.error(f"Error in tool_search_webcams_by_network: {e}")
+        return {"status": "error", "message": str(e), "isError": True}
 
 @register_tool(
     name="set_optical_sensor_filter",
@@ -1352,68 +1880,92 @@ async def tool_search_webcams_by_network(network: str, query: str = "", limit: i
             "filter_mode": {"type": "string", "enum": ["normal", "nvg", "flir", "mono"], "description": "Shader filter mode"}
         },
         "required": ["filter_mode"]
-    }
+    },
+    readOnlyHint=False,
+    destructiveHint=False,
+    idempotentHint=True,
+    openWorldHint=False
 )
 async def tool_set_optical_sensor_filter(filter_mode: str, **kwargs):
-    BOARD_STATE["optical_filter"] = filter_mode
-    return {"status": "updated", "optical_filter": filter_mode}
+    try:
+        BOARD_STATE["optical_filter"] = filter_mode
+        return {"status": "updated", "optical_filter": filter_mode}
+    except Exception as e:
+        logger.error(f"Error in tool_set_optical_sensor_filter: {e}")
+        return {"status": "error", "message": str(e), "isError": True}
 
 @register_tool(
     name="flush_system_ram",
     description="Trigger immediate memory cleanup and garbage collection across stream proxy caches, releasing unused memory.",
-    parameters={"type": "object", "properties": {}}
+    parameters={"type": "object", "properties": {}},
+    readOnlyHint=False,
+    destructiveHint=True,
+    idempotentHint=True,
+    openWorldHint=False
 )
 async def tool_flush_system_ram(**kwargs):
-    import gc
-    collected = gc.collect()
-    return {"status": "flushed", "unreachable_objects_collected": collected, "message": "RAM cache flushed successfully."}
+    try:
+        import gc
+        collected = gc.collect()
+        return {"status": "flushed", "unreachable_objects_collected": collected, "message": "RAM cache flushed successfully."}
+    except Exception as e:
+        logger.error(f"Error in tool_flush_system_ram: {e}")
+        return {"status": "error", "message": str(e), "isError": True}
 
 @register_tool(
     name="get_system_health",
     description="Comprehensive system diagnostic report: memory usage, active threads, node index statistics, and backend uptime.",
-    parameters={"type": "object", "properties": {}}
+    parameters={"type": "object", "properties": {}},
+    readOnlyHint=True,
+    destructiveHint=False,
+    idempotentHint=True,
+    openWorldHint=False
 )
 async def tool_get_system_health(**kwargs):
-    ram_mb = 0.0
-    threads_count = threading.active_count()
     try:
-        import psutil
-        proc = psutil.Process()
-        mem = proc.memory_info()
-        ram_mb = round(mem.rss / (1024 * 1024), 2)
-        threads_count = proc.num_threads()
-    except Exception:
+        ram_mb = 0.0
+        threads_count = threading.active_count()
         try:
-            import ctypes
-            class PROCESS_MEMORY_COUNTERS(ctypes.Structure):
-                _fields_ = [
-                    ('cb', ctypes.c_ulong),
-                    ('PageFaultCount', ctypes.c_ulong),
-                    ('PeakWorkingSetSize', ctypes.c_size_t),
-                    ('WorkingSetSize', ctypes.c_size_t),
-                    ('QuotaPeakPagedPoolUsage', ctypes.c_size_t),
-                    ('QuotaPagedPoolUsage', ctypes.c_size_t),
-                    ('QuotaPeakNonPagedPoolUsage', ctypes.c_size_t),
-                    ('QuotaNonPagedPoolUsage', ctypes.c_size_t),
-                    ('PagefileUsage', ctypes.c_size_t),
-                    ('PeakPagefileUsage', ctypes.c_size_t)
-                ]
-            counters = PROCESS_MEMORY_COUNTERS()
-            ctypes.windll.psapi.GetProcessMemoryInfo(ctypes.windll.kernel32.GetCurrentProcess(), ctypes.byref(counters), ctypes.sizeof(counters))
-            ram_mb = round(counters.WorkingSetSize / (1024 * 1024), 2)
+            import psutil
+            proc = psutil.Process()
+            mem = proc.memory_info()
+            ram_mb = round(mem.rss / (1024 * 1024), 2)
+            threads_count = proc.num_threads()
         except Exception:
-            ram_mb = 45.0
+            try:
+                import ctypes
+                class PROCESS_MEMORY_COUNTERS(ctypes.Structure):
+                    _fields_ = [
+                        ('cb', ctypes.c_ulong),
+                        ('PageFaultCount', ctypes.c_ulong),
+                        ('PeakWorkingSetSize', ctypes.c_size_t),
+                        ('WorkingSetSize', ctypes.c_size_t),
+                        ('QuotaPeakPagedPoolUsage', ctypes.c_size_t),
+                        ('QuotaPagedPoolUsage', ctypes.c_size_t),
+                        ('QuotaPeakNonPagedPoolUsage', ctypes.c_size_t),
+                        ('QuotaNonPagedPoolUsage', ctypes.c_size_t),
+                        ('PagefileUsage', ctypes.c_size_t),
+                        ('PeakPagefileUsage', ctypes.c_size_t)
+                    ]
+                counters = PROCESS_MEMORY_COUNTERS()
+                ctypes.windll.psapi.GetProcessMemoryInfo(ctypes.windll.kernel32.GetCurrentProcess(), ctypes.byref(counters), ctypes.sizeof(counters))
+                ram_mb = round(counters.WorkingSetSize / (1024 * 1024), 2)
+            except Exception:
+                ram_mb = 45.0
 
-    return {
-        "status": "HEALTHY",
-        "ram_working_set_mb": ram_mb,
-        "threads_active": threads_count,
-        "verified_webcams_indexed": len(camera_engine.real_cameras),
-        "verified_weather_stations": len(camera_engine.weather_stations),
-        "database_location": camera_engine.db_path,
-        "active_board_layout": BOARD_STATE.get("layout", {}),
-        "active_radar_provider": BOARD_STATE.get("radar_provider", "rainviewer")
-    }
+        return {
+            "status": "HEALTHY",
+            "ram_working_set_mb": ram_mb,
+            "threads_active": threads_count,
+            "verified_webcams_indexed": len(camera_engine.real_cameras),
+            "verified_weather_stations": len(camera_engine.weather_stations),
+            "database_location": camera_engine.db_path,
+            "active_board_layout": BOARD_STATE.get("layout", {}),
+            "active_radar_provider": BOARD_STATE.get("radar_provider", "rainviewer")
+        }
+    except Exception as e:
+        logger.error(f"Error in tool_get_system_health: {e}")
+        return {"status": "error", "message": str(e), "isError": True}
 
 
 # ------------------------------------------------------------------------------
@@ -1429,36 +1981,44 @@ async def tool_get_system_health(**kwargs):
             "bridge_url": {"type": "string", "description": "URL of the live OSINT backend bridge (defaults to 'http://127.0.0.1:8888')"},
             "force_reconnect": {"type": "boolean", "description": "Whether to force reset and re-establish session sockets"}
         }
-    }
+    },
+    readOnlyHint=False,
+    destructiveHint=False,
+    idempotentHint=True,
+    openWorldHint=False
 )
 async def tool_connect_to_bridge(bridge_url: str = "http://127.0.0.1:8888", force_reconnect: bool = True, **kwargs):
-    import httpx
-    t0 = time.time()
-    status = "connected"
-    latency_ms = 0.0
-    backend_info = {}
     try:
-        async with httpx.AsyncClient(timeout=3.0) as client:
-            resp = await client.get(f"{bridge_url.rstrip('/')}/health")
+        import httpx
+        t0 = time.time()
+        status = "connected"
+        latency_ms = 0.0
+        backend_info = {}
+        try:
+            async with httpx.AsyncClient(timeout=3.0) as client:
+                resp = await client.get(f"{bridge_url.rstrip('/')}/health")
+                latency_ms = round((time.time() - t0) * 1000, 2)
+                if resp.status_code == 200:
+                    backend_info = resp.json()
+                else:
+                    status = f"http_{resp.status_code}"
+        except Exception as e:
+            status = f"standalone_mode (bridge unreachable: {e})"
             latency_ms = round((time.time() - t0) * 1000, 2)
-            if resp.status_code == 200:
-                backend_info = resp.json()
-            else:
-                status = f"http_{resp.status_code}"
-    except Exception as e:
-        status = f"standalone_mode (bridge unreachable: {e})"
-        latency_ms = round((time.time() - t0) * 1000, 2)
     
-    return {
-        "status": "connected" if "standalone" not in status else status,
-        "bridge_url": bridge_url,
-        "latency_ms": latency_ms,
-        "backend_response": backend_info,
-        "board_viewport": BOARD_STATE.get("viewport", {}),
-        "board_monitors": BOARD_STATE.get("monitors", {}),
-        "total_mcp_tools": len(TOOL_DEFINITIONS),
-        "message": "AI Agent bridge link verified and active."
-    }
+        return {
+            "status": "connected" if "standalone" not in status else status,
+            "bridge_url": bridge_url,
+            "latency_ms": latency_ms,
+            "backend_response": backend_info,
+            "board_viewport": BOARD_STATE.get("viewport", {}),
+            "board_monitors": BOARD_STATE.get("monitors", {}),
+            "total_mcp_tools": len(TOOL_DEFINITIONS),
+            "message": "AI Agent bridge link verified and active."
+        }
+    except Exception as e:
+        logger.error(f"Error in tool_connect_to_bridge: {e}")
+        return {"status": "error", "message": str(e), "isError": True}
 
 @register_tool(
     name="zoom_map_zone",
@@ -1473,22 +2033,30 @@ async def tool_connect_to_bridge(bridge_url: str = "http://127.0.0.1:8888", forc
             "include_radar": {"type": "boolean", "description": "Whether Doppler radar overlay should be active"}
         },
         "required": ["lat", "lon"]
-    }
+    },
+    readOnlyHint=False,
+    destructiveHint=False,
+    idempotentHint=True,
+    openWorldHint=False
 )
 async def tool_zoom_map_zone(lat: float, lon: float, zoom: int = 10, zone_name: str = "Tactical Sector", include_radar: bool = True, **kwargs):
-    zoom = max(2, min(18, int(zoom)))
-    BOARD_STATE["viewport"] = {
-        "lat": float(lat),
-        "lon": float(lon),
-        "zoom": zoom,
-        "zone_name": zone_name,
-        "include_radar": include_radar
-    }
-    return {
-        "status": "zoomed",
-        "viewport": BOARD_STATE["viewport"],
-        "message": f"Tactical map MON-01 zoomed into zone '{zone_name}' at {lat:.4f}°, {lon:.4f}° (Zoom {zoom})."
-    }
+    try:
+        zoom = max(2, min(18, int(zoom)))
+        BOARD_STATE["viewport"] = {
+            "lat": float(lat),
+            "lon": float(lon),
+            "zoom": zoom,
+            "zone_name": zone_name,
+            "include_radar": include_radar
+        }
+        return {
+            "status": "zoomed",
+            "viewport": BOARD_STATE["viewport"],
+            "message": f"Tactical map MON-01 zoomed into zone '{zone_name}' at {lat:.4f}°, {lon:.4f}° (Zoom {zoom})."
+        }
+    except Exception as e:
+        logger.error(f"Error in tool_zoom_map_zone: {e}")
+        return {"status": "error", "message": str(e), "isError": True}
 
 @register_tool(
     name="capture_mon1_map_image",
@@ -1503,7 +2071,11 @@ async def tool_zoom_map_zone(lat: float, lon: float, zoom: int = 10, zone_name: 
             "include_radar": {"type": "boolean", "description": "Whether to composite live Doppler radar overlay (default True)"},
             "quality": {"type": "integer", "description": "JPEG compression quality (default 80)"}
         }
-    }
+    },
+    readOnlyHint=True,
+    destructiveHint=False,
+    idempotentHint=True,
+    openWorldHint=False
 )
 async def tool_capture_mon1_map_image(
     lat: Optional[float] = None,
@@ -1514,22 +2086,26 @@ async def tool_capture_mon1_map_image(
     quality: int = 80,
     **kwargs
 ):
-    from backend.services.capture_service import render_mon1_map_770p
-    vp = BOARD_STATE.get("viewport", {})
-    target_lat = lat if lat is not None else vp.get("lat", 47.4211)
-    target_lon = lon if lon is not None else vp.get("lon", 10.9853)
-    target_zoom = zoom if zoom is not None else vp.get("zoom", 10)
-    target_zone = zone_name if zone_name is not None else vp.get("zone_name", "Tactical Map")
+    try:
+        from backend.services.capture_service import render_mon1_map_770p
+        vp = BOARD_STATE.get("viewport", {})
+        target_lat = lat if lat is not None else vp.get("lat", 47.4211)
+        target_lon = lon if lon is not None else vp.get("lon", 10.9853)
+        target_zoom = zoom if zoom is not None else vp.get("zoom", 10)
+        target_zone = zone_name if zone_name is not None else vp.get("zone_name", "Tactical Map")
 
-    res = await render_mon1_map_770p(
-        lat=target_lat,
-        lon=target_lon,
-        zoom=target_zoom,
-        zone_name=target_zone,
-        include_radar=include_radar,
-        quality=quality
-    )
-    return res
+        res = await render_mon1_map_770p(
+            lat=target_lat,
+            lon=target_lon,
+            zoom=target_zoom,
+            zone_name=target_zone,
+            include_radar=include_radar,
+            quality=quality
+        )
+        return res
+    except Exception as e:
+        logger.error(f"Error in tool_capture_mon1_map_image: {e}")
+        return {"status": "error", "message": str(e), "isError": True}
 
 @register_tool(
     name="select_camera_and_timeline",
@@ -1542,36 +2118,44 @@ async def tool_capture_mon1_map_image(
             "timestamp": {"type": "string", "description": "Optional historical ISO timestamp or archive key (e.g. '2026-10-10 12:00:00')"}
         },
         "required": ["camera_id"]
-    }
+    },
+    readOnlyHint=False,
+    destructiveHint=False,
+    idempotentHint=True,
+    openWorldHint=False
 )
 async def tool_select_camera_and_timeline(camera_id: str, timeline_mode: str = "live", timestamp: Optional[str] = None, **kwargs):
-    cam = camera_engine.get_camera_by_id(camera_id)
-    if not cam:
-        searched = camera_engine.search_cameras(query=camera_id, page_size=1)
-        if searched:
-            cam = searched[0]
+    try:
+        cam = camera_engine.get_camera_by_id(camera_id)
+        if not cam:
+            searched = camera_engine.search_cameras(query=camera_id, page_size=1)
+            if searched:
+                cam = searched[0]
 
-    if not cam:
-        return {"error": f"Camera '{camera_id}' not found in spatial database.", "status": "failed"}
+        if not cam:
+            return {"error": f"Camera '{camera_id}' not found in spatial database.", "status": "failed"}
 
-    BOARD_STATE["monitors"]["MON-02"] = {
-        "camera_id": cam.get("id", camera_id),
-        "title": cam.get("title", "Optical Camera"),
-        "stream_url": cam.get("stream_url") or cam.get("preview_url") or cam.get("poster_url"),
-        "preview_url": cam.get("preview_url") or cam.get("poster_url"),
-        "provider": cam.get("provider", "OSINT"),
-        "lat": cam.get("lat"),
-        "lon": cam.get("lon"),
-        "timeline_mode": timeline_mode,
-        "timestamp": timestamp
-    }
+        BOARD_STATE["monitors"]["MON-02"] = {
+            "camera_id": cam.get("id", camera_id),
+            "title": cam.get("title", "Optical Camera"),
+            "stream_url": cam.get("stream_url") or cam.get("preview_url") or cam.get("poster_url"),
+            "preview_url": cam.get("preview_url") or cam.get("poster_url"),
+            "provider": cam.get("provider", "OSINT"),
+            "lat": cam.get("lat"),
+            "lon": cam.get("lon"),
+            "timeline_mode": timeline_mode,
+            "timestamp": timestamp
+        }
 
-    return {
-        "status": "selected",
-        "monitor": "MON-02",
-        "camera": BOARD_STATE["monitors"]["MON-02"],
-        "message": f"MON-02 switched to camera '{cam.get('title')}' ({camera_id}) with timeline horizon '{timeline_mode}'."
-    }
+        return {
+            "status": "selected",
+            "monitor": "MON-02",
+            "camera": BOARD_STATE["monitors"]["MON-02"],
+            "message": f"MON-02 switched to camera '{cam.get('title')}' ({camera_id}) with timeline horizon '{timeline_mode}'."
+        }
+    except Exception as e:
+        logger.error(f"Error in tool_select_camera_and_timeline: {e}")
+        return {"status": "error", "message": str(e), "isError": True}
 
 @register_tool(
     name="capture_mon2_camera_image",
@@ -1585,7 +2169,11 @@ async def tool_select_camera_and_timeline(camera_id: str, timeline_mode: str = "
             "filter_mode": {"type": "string", "enum": ["normal", "nvg", "flir", "mono"], "description": "Optical shader filter (normal, nvg green phosphor, flir ironbow, mono surveillance)"},
             "quality": {"type": "integer", "description": "JPEG compression quality (default 80)"}
         }
-    }
+    },
+    readOnlyHint=True,
+    destructiveHint=False,
+    idempotentHint=True,
+    openWorldHint=True
 )
 async def tool_capture_mon2_camera_image(
     camera_id: Optional[str] = None,
@@ -1595,21 +2183,25 @@ async def tool_capture_mon2_camera_image(
     quality: int = 80,
     **kwargs
 ):
-    from backend.services.capture_service import render_mon2_camera_770p
-    m2_state = BOARD_STATE.get("monitors", {}).get("MON-02", {})
-    target_cam_id = camera_id if camera_id is not None else m2_state.get("camera_id", "px_zugspitze")
-    target_timeline = timeline_mode if timeline_mode is not None else m2_state.get("timeline_mode", "live")
-    target_timestamp = timestamp if timestamp is not None else m2_state.get("timestamp")
-    target_filter = filter_mode or BOARD_STATE.get("optical_filter", "normal")
+    try:
+        from backend.services.capture_service import render_mon2_camera_770p
+        m2_state = BOARD_STATE.get("monitors", {}).get("MON-02", {})
+        target_cam_id = camera_id if camera_id is not None else m2_state.get("camera_id", "px_zugspitze")
+        target_timeline = timeline_mode if timeline_mode is not None else m2_state.get("timeline_mode", "live")
+        target_timestamp = timestamp if timestamp is not None else m2_state.get("timestamp")
+        target_filter = filter_mode or BOARD_STATE.get("optical_filter", "normal")
 
-    res = await render_mon2_camera_770p(
-        cam_data=target_cam_id,
-        timeline_mode=target_timeline,
-        timestamp=target_timestamp,
-        filter_mode=target_filter,
-        quality=quality
-    )
-    return res
+        res = await render_mon2_camera_770p(
+            cam_data=target_cam_id,
+            timeline_mode=target_timeline,
+            timestamp=target_timestamp,
+            filter_mode=target_filter,
+            quality=quality
+        )
+        return res
+    except Exception as e:
+        logger.error(f"Error in tool_capture_mon2_camera_image: {e}")
+        return {"status": "error", "message": str(e), "isError": True}
 
 
 # ==============================================================================
