@@ -14,6 +14,7 @@
 >
 > - **Official Native / Desktop OSINT Repository**: [`https://github.com/finnytech/omniscope-osint`](https://github.com/finnytech/omniscope-osint)
 > - **Official Web Edition Repository**: [`https://github.com/finnytech/omniscope-web`](https://github.com/finnytech/omniscope-web)
+> - **Official Standalone MCP Suite Repository**: [`https://github.com/finnytech/omniscope-mcp`](https://github.com/finnytech/omniscope-mcp)
 > - **Canonical Live Web App**: [`https://omniscope-web.pages.dev`](https://omniscope-web.pages.dev)
 >
 > Always verify that you are cloning and contributing to the official **FinnyTech** repositories.
@@ -147,6 +148,55 @@ Running `setup_wizard.py` launches a terminal setup assistant:
 
 ---
 
+## 🤖 Model Context Protocol (MCP) Suite
+
+OmniScope features a dedicated, standalone repository for its complete Model Context Protocol ecosystem:  
+👉 **Official Standalone MCP Repository**: [`https://github.com/finnytech/omniscope-mcp`](https://github.com/finnytech/omniscope-mcp)
+
+It provides **two official editions**:
+1. **🌐 Web Edge MCP (`omniscope-web-mcp`)**: Zero-dependency cloud client querying live Cloudflare Anycast APIs ([omniscope-web.pages.dev](https://omniscope-web.pages.dev)).
+2. **🖥️ Local Spatial Grid MCP (`omniscope-local-mcp`)**: Sub-millisecond direct SQLite IPC querying local `nodes.db` / `omniscope_spatial.db` (1,013,474 indexed ground nodes).
+
+### Running Local MCP from Source:
+```bash
+python run_mcp.py
+```
+Or via `run_server.py`:
+```bash
+python run_server.py --mcp
+```
+
+### Running from Standalone Windows `.exe`:
+```cmd
+OmniScope.exe --mcp
+```
+
+### 3. Configure in Claude Desktop (`claude_desktop_config.json`):
+```json
+{
+  "mcpServers": {
+    "omniscope-local": {
+      "command": "python",
+      "args": ["D:/projects/omniscope-osint/run_mcp.py"]
+    }
+  }
+}
+```
+
+### 4. Configure in Cursor (`.cursor/mcp.json`):
+```json
+{
+  "mcpServers": {
+    "omniscope-local": {
+      "command": "python",
+      "args": ["D:/projects/omniscope-osint/run_mcp.py"]
+    }
+  }
+}
+```
+
+---
+
 ## 📄 License
 
 Distributed under the **MIT License**. See `LICENSE` for details.
@@ -156,4 +206,3 @@ Distributed under the **MIT License**. See `LICENSE` for details.
 ## 🏷️ Tags & Keywords
 
 `osint` • `open-source-intelligence` • `geoint` • `sigint` • `weather` • `earth-observation` • `doppler-radar` • `weather-radar` • `meteorology` • `geospatial` • `gis` • `leaflet` • `fastapi` • `python` • `surveillance` • `cctv` • `traffic-cameras` • `webcams` • `earthquake` • `usgs` • `noaa` • `nexrad` • `radar` • `satellite` • `remote-sensing` • `situational-awareness` • `mcp` • `model-context-protocol` • `tactical` • `cyberpunk` • `dashboard` • `realtime` • `sqlite` • `spatial-database` • `open-meteo` • `rainviewer` • `maritime` • `ais` • `aviation` • `space-weather` • `solar-flare` • `disaster-response` • `emergency-management` • `storm-tracking` • `hurricane-tracker` • `tornado-tracking` • `wildfire-tracking` • `firms` • `environmental-monitoring` • `command-center` • `threat-intelligence` • `defense-tech` • `panomax` • `flight-tracking`
-
