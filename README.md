@@ -177,11 +177,12 @@ OmniScope.exe --mcp
   "mcpServers": {
     "omniscope-local": {
       "command": "python",
-      "args": ["D:/projects/omniscope-osint/run_mcp.py"]
+      "args": ["<PATH_TO_OMNISCOPE_OSINT>/run_mcp.py"]
     }
   }
 }
 ```
+> 💡 *Replace `<PATH_TO_OMNISCOPE_OSINT>` with the directory where you cloned this repository (e.g. `/home/user/omniscope-osint` or `C:/tools/omniscope-osint`).*
 
 ### 4. Configure in Cursor (`.cursor/mcp.json`):
 ```json
@@ -189,7 +190,7 @@ OmniScope.exe --mcp
   "mcpServers": {
     "omniscope-local": {
       "command": "python",
-      "args": ["D:/projects/omniscope-osint/run_mcp.py"]
+      "args": ["<PATH_TO_OMNISCOPE_OSINT>/run_mcp.py"]
     }
   }
 }
