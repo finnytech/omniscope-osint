@@ -208,4 +208,3 @@ Distributed under the **MIT License**. See `LICENSE` for details.
 ## 🏷️ Tags & Keywords
 
 `osint` • `open-source-intelligence` • `geoint` • `sigint` • `weather` • `earth-observation` • `doppler-radar` • `weather-radar` • `meteorology` • `geospatial` • `gis` • `leaflet` • `fastapi` • `python` • `surveillance` • `cctv` • `traffic-cameras` • `webcams` • `earthquake` • `usgs` • `noaa` • `nexrad` • `radar` • `satellite` • `remote-sensing` • `situational-awareness` • `mcp` • `model-context-protocol` • `tactical` • `cyberpunk` • `dashboard` • `realtime` • `sqlite` • `spatial-database` • `open-meteo` • `rainviewer` • `maritime` • `ais` • `aviation` • `space-weather` • `solar-flare` • `disaster-response` • `emergency-management` • `storm-tracking` • `hurricane-tracker` • `tornado-tracking` • `wildfire-tracking` • `firms` • `environmental-monitoring` • `command-center` • `threat-intelligence` • `defense-tech` • `panomax` • `flight-tracking`
-
