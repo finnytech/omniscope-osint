@@ -591,9 +591,10 @@ class StreamPlayer {
 
         let triedProxy = false;
         let triedFallback = false;
+        let triedRecon = false;
 
         const handleImageError = () => {
-            if (!triedProxy) {
+            if (!triedProxy && !imgUrl.startsWith('/api/proxy/')) {
                 triedProxy = true;
                 if (snapImg) {
                     snapImg.src = `/api/proxy/image?url=${encodeURIComponent(imgUrl)}&_t=${Date.now()}`;
@@ -602,6 +603,17 @@ class StreamPlayer {
                 triedFallback = true;
                 if (snapImg) {
                     snapImg.src = fallbackUrl;
+                }
+            } else if (!triedRecon && camData && camData.lat && camData.lon) {
+                triedRecon = true;
+                const minx = camData.lon - 0.0035;
+                const maxx = camData.lon + 0.0035;
+                const miny = camData.lat - 0.002;
+                const maxy = camData.lat + 0.002;
+                const esriRecon = `https://services.arcgisonline.com/arcgis/rest/services/World_Imagery/MapServer/export?bbox=${minx.toFixed(6)},${miny.toFixed(6)},${maxx.toFixed(6)},${maxy.toFixed(6)}&bboxSR=4326&imageSR=4326&size=640,360&f=image`;
+                console.warn(`[SnapshotPlayer] Feed failed -> Auto-fallback to authentic satellite ortho-recon for ${camData.title}`);
+                if (snapImg) {
+                    snapImg.src = esriRecon;
                 }
             } else {
                 // If proxy fails with 502/504 or network error, show authentic offline status
@@ -650,6 +662,7 @@ class StreamPlayer {
         const loc = camData ? `${camData.city || ''} ${camData.country ? '(' + camData.country + ')' : ''}`.trim() : '';
         const coords = (camData && camData.lat && camData.lon) ? ` // POS: ${Number(camData.lat).toFixed(4)}°, ${Number(camData.lon).toFixed(4)}°` : '';
         const extUrl = camData ? (camData.stream_url || camData.live_video_url || '') : '';
+        const hasCoords = !!(camData && camData.lat && camData.lon);
 
         this.container.innerHTML = `
             <div style="position:relative;width:100%;height:100%;background:#060a12;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:var(--font-mono);color:#94a3b8;padding:16px;text-align:center;overflow-y:auto;box-sizing:border-box;">
@@ -666,11 +679,15 @@ class StreamPlayer {
                 <div style="color:#f8fafc;font-size:0.85rem;margin-bottom:4px;font-weight:600;max-width:80%;">
                     ${title}
                 </div>
-                <div style="color:#64748b;font-size:0.72rem;margin-bottom:16px;">
+                <div style="color:#64748b;font-size:0.72rem;margin-bottom:14px;">
                     ${loc ? loc + ' // ' : ''}NETZWERK: ${prov.toUpperCase()}${coords} // ${reason}
                 </div>
 
-                <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;">
+                <div style="display:flex;gap:8px;flex-wrap:wrap;justify-content:center;margin-bottom:10px;">
+                    ${hasCoords ? `
+                    <button id="btn-offline-recon" class="ops-btn" style="padding:6px 14px;font-size:0.75rem;cursor:pointer;background:#059669;border:1px solid #10b981;color:#fff;font-weight:bold;">
+                        🛰️ SATELLITEN-RECON AKTIVIEREN
+                    </button>` : ''}
                     <button id="btn-offline-next" class="ops-btn active" style="padding:6px 14px;font-size:0.75rem;cursor:pointer;background:#0284c7;border:1px solid #38bdf8;color:#fff;font-weight:bold;">
                         ▶ NÄCHSTE KAMERA LADEN
                     </button>
@@ -682,12 +699,50 @@ class StreamPlayer {
                         🔗 QUELLE TESTEN
                     </button>` : ''}
                 </div>
+
+                <div id="offline-failover-indicator" style="font-size:0.7rem;color:#38bdf8;opacity:0.85;">
+                    Automatischer Failover zur nächsten aktiven Kamera in <span id="failover-timer-count">8</span>s...
+                </div>
             </div>
         `;
+
+        let failoverCount = 8;
+        const countdownEl = document.getElementById('failover-timer-count');
+        const clearCountdown = () => {
+            if (this.failoverInterval) {
+                clearInterval(this.failoverInterval);
+                this.failoverInterval = null;
+            }
+            const ind = document.getElementById('offline-failover-indicator');
+            if (ind) ind.style.display = 'none';
+        };
+
+        this.failoverInterval = setInterval(() => {
+            failoverCount--;
+            if (countdownEl) countdownEl.innerText = failoverCount;
+            if (failoverCount <= 0) {
+                clearCountdown();
+                this.loadNextRealCam();
+            }
+        }, 1000);
+
+        const reconBtn = document.getElementById('btn-offline-recon');
+        if (reconBtn && camData && camData.lat && camData.lon) {
+            reconBtn.onclick = () => {
+                clearCountdown();
+                const minx = camData.lon - 0.0035;
+                const maxx = camData.lon + 0.0035;
+                const miny = camData.lat - 0.002;
+                const maxy = camData.lat + 0.002;
+                const esriRecon = `https://services.arcgisonline.com/arcgis/rest/services/World_Imagery/MapServer/export?bbox=${minx.toFixed(6)},${miny.toFixed(6)},${maxx.toFixed(6)},${maxy.toFixed(6)}&bboxSR=4326&imageSR=4326&size=640,360&f=image`;
+                this.playLiveSnapshot(camData, esriRecon);
+            };
+        }
 
         const retryBtn = document.getElementById('btn-offline-retry');
         if (retryBtn) {
             retryBtn.onclick = () => {
+                clearCountdown();
                 if (this.currentCamData) {
                     this.playCam(this.currentCamData, this.currentTimeline || 'live');
                 }
@@ -697,6 +752,7 @@ class StreamPlayer {
         const nextBtn = document.getElementById('btn-offline-next');
         if (nextBtn) {
             nextBtn.onclick = () => {
+                clearCountdown();
                 this.loadNextRealCam();
             };
         }

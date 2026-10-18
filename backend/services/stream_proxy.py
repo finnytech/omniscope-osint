@@ -447,4 +447,20 @@ async def proxy_camera_recon(lat: float, lon: float, id: Optional[str] = None):
         logger.warning(f"Error fetching camera recon for ({lat}, {lon}): {e}")
 
     # Fallback to dark tactical grid placeholder instead of broken image
-    raise HTTPException(status_code=502, detail="Failed to retrieve camera reconnaissance imagery")
+    tactical_svg = f"""<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360" viewBox="0 0 640 360">
+      <rect width="640" height="360" fill="#060a12"/>
+      <circle cx="320" cy="180" r="45" stroke="#0284c7" stroke-width="1.5" fill="none" stroke-dasharray="4 2"/>
+      <circle cx="320" cy="180" r="18" stroke="#38bdf8" stroke-width="1" fill="none"/>
+      <line x1="320" y1="115" x2="320" y2="245" stroke="#0284c7" stroke-width="1"/>
+      <line x1="255" y1="180" x2="385" y2="180" stroke="#0284c7" stroke-width="1"/>
+      <text x="320" y="275" font-family="monospace" font-size="11" fill="#38bdf8" text-anchor="middle" letter-spacing="1.5">OMNISCOPE SENSOR RECON // LAT: {round(lat, 4)}° LON: {round(lon, 4)}°</text>
+      <text x="320" y="295" font-family="monospace" font-size="9" fill="#64748b" text-anchor="middle">SATELLITE PASS ACQUISITION IN PROGRESS</text>
+    </svg>"""
+    return Response(
+        content=tactical_svg.encode("utf-8"),
+        media_type="image/svg+xml",
+        headers={
+            **CORS_HEADERS,
+            "Cache-Control": "public, max-age=300"
+        }
+    )
