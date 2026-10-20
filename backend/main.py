@@ -63,7 +63,7 @@ async def lifespan(app: FastAPI):
     yield
     await http_client.aclose()
 
-app = FastAPI(title="OmniScope OSINT", version="2.0.0-oss", lifespan=lifespan)
+app = FastAPI(title="OmniScope Privat [Origin Edition]", version="2.1.0-privat", lifespan=lifespan)
 
 app.add_middleware(GZipMiddleware, minimum_size=1000)
 app.add_middleware(
