@@ -28,7 +28,7 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if BASE_DIR not in sys.path:
     sys.path.insert(0, BASE_DIR)
 
-from backend.config import load_keys, save_keys, get_capabilities
+from backend.config import load_keys, save_keys
 from backend.services.camera_engine import CameraEngine
 from backend.services.weather_engine import weather_engine
 from backend.services.telemetry_engine import TelemetryEngine
@@ -52,7 +52,7 @@ from backend.services.feedback_logger import feedback_logger
 from fastapi.middleware.gzip import GZipMiddleware
 from contextlib import asynccontextmanager
 
-logger = logging.getLogger("OmniScopeGateway")
+logger = logging.getLogger("NexusGateway")
 logging.basicConfig(level=logging.INFO, format="[%(asctime)s] [%(name)s] [%(levelname)s] %(message)s")
 
 # Global HTTP client
@@ -96,26 +96,14 @@ CAMERAS_DB_PATH = os.path.join(BASE_DIR, "backend", "data", "cameras_db.json")
 # SYSTEM & CONFIGURATION ENDPOINTS
 # =====================================================================
 
-@app.get("/api/capabilities")
-async def get_system_capabilities():
-    """
-    Returns dynamically enabled features based on active API keys.
-    Strict zero-fake policy: features with missing keys are marked active=False
-    and are completely omitted from the UI without mock data or phantom queries.
-    """
-    return get_capabilities()
-
 @app.get("/api/health")
 async def health_check():
     keys = load_keys()
-    caps = get_capabilities()
     total_nodes = camera_engine.total_cameras_count + camera_engine.weather_stations_count
     return {
         "status": "online",
-        "app": "OMNISCOPE-OSINT",
-        "version": "2.0.0-oss",
+        "app": "CYBER-SPECTRE-NEXUS",
         "grid": "active",
-        "zero_fake_policy": True,
         "real_cameras_count": camera_engine.real_cameras_count,
         "flock_cameras_count": camera_engine.flock_cameras_count,
         "telemetry_nodes_count": camera_engine.telemetry_nodes_count,
@@ -123,7 +111,13 @@ async def health_check():
         "total_cameras": camera_engine.total_cameras_count,
         "total_nodes": total_nodes,
         "cameras_count": camera_engine.total_cameras_count,
-        "capabilities": caps
+        "active_keys": {
+            "mapbox": bool(keys.get("mapbox_token")),
+            "firms": bool(keys.get("firms_map_key")),
+            "openweather": bool(keys.get("openweather_api_key")),
+            "opensky": bool(keys.get("opensky_client_id")),
+            "nokey_networks": True
+        }
     }
 
 @app.get("/api/cameras/stats")
@@ -547,7 +541,7 @@ async def get_cameras_in_bbox(
 async def get_feedback_logs(limit: int = Query(100, ge=1, le=1000), event_type: Optional[str] = Query(None)):
     """
     Returns structured diagnostic scan and feedback logs directly from
-    logs/feedback_logs.json.
+    D:\\projects\\cyber_spectre_nexus\\logs\\feedback_logs.json.
     """
     logs = feedback_logger.get_logs(limit, event_type)
     return {
@@ -591,7 +585,7 @@ async def proxy_maptiler_tile(style: str, z: int, x: int, y: str):
     ext = "jpg" if "sat" in style.lower() else "png"
     tile_url = f"https://api.maptiler.com/maps/{style}/{z}/{x}/{clean_y}.{ext}?key={maptiler_key}"
     headers = {
-        "User-Agent": "OmniScope-OSINT/2.0"
+        "User-Agent": "CyberSpectreNexus/2.5"
     }
     try:
         resp = await http_client.get(tile_url, headers=headers)
@@ -696,6 +690,18 @@ async def get_camera_by_id(cam_id: str):
     if not cam:
         raise HTTPException(status_code=404, detail="Camera not found")
     return cam
+
+
+@app.get("/api/flock/{cam_id}/telemetry")
+async def get_flock_telemetry(cam_id: str):
+    """
+    Returns live vehicle recognition / ALPR activity telemetry for the MON-02 View Inspector.
+    Preserves transparency_portal_url, audit_url, hardware, and zone metadata.
+    """
+    telemetry = camera_engine.get_flock_telemetry(cam_id)
+    if not telemetry:
+        raise HTTPException(status_code=404, detail=f"Flock ALPR camera {cam_id} not found in registry")
+    return telemetry
 
 
 # =====================================================================
@@ -992,17 +998,6 @@ async def get_flights_telemetry(
     lamax: Optional[float] = None,
     lomax: Optional[float] = None
 ):
-    caps = get_capabilities()
-    if not caps.get("keyed_providers", {}).get("opensky_flights", False):
-        return {
-            "status": "omitted",
-            "enabled": False,
-            "provider": "OpenSky Network",
-            "message": "OpenSky ADS-B telemetry omitted (no credentials configured). Zero-fake policy active.",
-            "flights": [],
-            "count": 0,
-            "total_world_fleet": 0
-        }
     bbox = None
     if all(v is not None for v in (lamin, lomin, lamax, lomax)):
         bbox = (lamin, lomin, lamax, lomax)
@@ -1393,8 +1388,9 @@ async def ai_body_pose(payload: Dict[str, Any] = Body(...)):
     return await nvidia_nim.process_daytime_lapse_pose(cam_id, frames_or_video)
 
 
+
 # =====================================================================
-# LIVE KEYLESS OPEN DATA PROVIDERS (v2.1.0 ZERO-FAKE DYNAMIC FEEDS)
+# TACTICAL INTELLIGENCE FEEDS & PROXIES (8 NEW DOMAINS)
 # =====================================================================
 
 @app.get("/api/cyber/cables")
@@ -1402,56 +1398,45 @@ async def get_submarine_cables():
     try:
         r = await http_client.get(
             "https://www.submarinecablemap.com/api/v3/cable/cable-geo.json",
-            headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36", "Referer": "https://www.submarinecablemap.com/"}
+            headers={"User-Agent": "OmniScope-OSINT/2.1", "Accept": "application/json"}
         )
         return Response(content=r.content, media_type="application/json")
     except Exception as e:
-        raise HTTPException(status_code=502, detail=f"Submarine cable upstream error: {str(e)}")
+        raise HTTPException(status_code=502, detail=f"Cables error: {str(e)}")
 
 @app.get("/api/cyber/landing-points")
-async def get_submarine_landing_points():
+async def get_landing_points():
     try:
         r = await http_client.get(
             "https://www.submarinecablemap.com/api/v3/landing-point/landing-point-geo.json",
-            headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36", "Referer": "https://www.submarinecablemap.com/"}
+            headers={"User-Agent": "OmniScope-OSINT/2.1", "Accept": "application/json"}
         )
         return Response(content=r.content, media_type="application/json")
     except Exception as e:
-        raise HTTPException(status_code=502, detail=f"Landing points upstream error: {str(e)}")
-
-@app.get("/api/cyber/cable-detail")
-async def get_submarine_cable_detail(id: str = Query(...)):
-    try:
-        r = await http_client.get(
-            f"https://www.submarinecablemap.com/api/v3/cable/{id.strip().lower()}.json",
-            headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36", "Referer": "https://www.submarinecablemap.com/"}
-        )
-        return Response(content=r.content, media_type="application/json")
-    except Exception as e:
-        raise HTTPException(status_code=502, detail=f"Cable detail upstream error: {str(e)}")
+        raise HTTPException(status_code=502, detail=f"Landing points error: {str(e)}")
 
 @app.get("/api/cyber/tor-relays")
 async def get_tor_relays(limit: int = 100):
     try:
-        limit_val = min(max(limit, 10), 300)
+        limit_val = min(max(limit, 10), 500)
         r = await http_client.get(
             f"https://onionoo.torproject.org/details?type=relay&running=true&limit={limit_val}",
-            headers={"User-Agent": "OmniScope-OSINT/2.1 (contact@omniscope.local)"}
+            headers={"User-Agent": "OmniScope-OSINT/2.1"}
         )
         return Response(content=r.content, media_type="application/json")
     except Exception as e:
-        raise HTTPException(status_code=502, detail=f"Tor Onionoo upstream error: {str(e)}")
+        raise HTTPException(status_code=502, detail=f"Tor Onionoo error: {str(e)}")
 
 @app.get("/api/disasters/gdacs")
 async def get_gdacs_disasters():
     try:
         r = await http_client.get(
-            "https://www.gdacs.org/gdacsapi/api/events/geteventlist/SEARCH?eventtypes=EQ,TC,FL,VO,DR",
+            "https://www.gdacs.org/gdacsapi/api/events/geteventlist/MET",
             headers={"User-Agent": "Mozilla/5.0"}
         )
         return Response(content=r.content, media_type="application/json")
     except Exception as e:
-        raise HTTPException(status_code=502, detail=f"GDACS upstream error: {str(e)}")
+        raise HTTPException(status_code=502, detail=f"GDACS error: {str(e)}")
 
 @app.get("/api/radiation/safecast")
 async def get_safecast_radiation(limit: int = 100):
@@ -1501,7 +1486,7 @@ async def get_safecast_radiation(limit: int = 100):
         )
         return Response(content=r.content, media_type="application/json")
     except Exception as e:
-        raise HTTPException(status_code=502, detail=f"Radiation upstream error: {str(e)}")
+        raise HTTPException(status_code=502, detail=f"Radiation error: {str(e)}")
 
 @app.get("/api/maritime/baltic-ais")
 async def get_baltic_ais():
@@ -1512,18 +1497,7 @@ async def get_baltic_ais():
         )
         return Response(content=r.content, media_type="application/json")
     except Exception as e:
-        raise HTTPException(status_code=502, detail=f"Baltic AIS upstream error: {str(e)}")
-
-@app.get("/api/aviation/airports")
-async def get_faa_airport_status():
-    try:
-        r = await http_client.get(
-            "https://nasstatus.faa.gov/api/airport-status-information",
-            headers={"User-Agent": "Mozilla/5.0"}
-        )
-        return Response(content=r.content, media_type="application/xml")
-    except Exception as e:
-        raise HTTPException(status_code=502, detail=f"FAA Airport status error: {str(e)}")
+        raise HTTPException(status_code=502, detail=f"Baltic AIS error: {str(e)}")
 
 @app.get("/api/aviation/metar")
 async def get_aviation_metar(ids: str = "KJFK,KLAX,KORD,KATL,EGLL,LFPG,EDDF,EHAM,RJTT,OMDB,VHHH,WSSS,YSSY,SBGR,FACT"):
@@ -1577,6 +1551,52 @@ async def get_near_earth_asteroids(dist_max: str = "0.05", limit: int = 25):
         return Response(content=r.content, media_type="application/json")
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"JPL CAD error: {str(e)}")
+
+@app.get("/api/weather/stations/nearby")
+async def get_nearby_metar_stations(lat: float = 50.0, lon: float = 10.0, limit: int = 20):
+    try:
+        delta_lat = 1.6
+        delta_lon = 2.2
+        min_lat = f"{lat - delta_lat:.4f}"
+        min_lon = f"{lon - delta_lon:.4f}"
+        max_lat = f"{lat + delta_lat:.4f}"
+        max_lon = f"{lon + delta_lon:.4f}"
+        r = await http_client.get(
+            f"https://aviationweather.gov/api/data/metar?format=geojson&bbox={min_lat},{min_lon},{max_lat},{max_lon}",
+            headers={"User-Agent": "OmniScope-OSINT/2.1 (contact@omniscope.dev)"}
+        )
+        if r.status_code == 200:
+            data = r.json()
+            import math
+            stations = []
+            for f in data.get("features", []):
+                p = f.get("properties", {})
+                coords = f.get("geometry", {}).get("coordinates", [lon, lat])
+                d_lat = coords[1] - lat
+                d_lon = (coords[0] - lon) * math.cos(lat * math.pi / 180)
+                dist_km = round(math.sqrt(d_lat * d_lat + d_lon * d_lon) * 111.32)
+                stations.append({
+                    "id": p.get("id", "METAR"),
+                    "name": p.get("site", f"Aviation Met Station {p.get('id')}"),
+                    "lat": coords[1],
+                    "lon": coords[0],
+                    "elevation": coords[2] if len(coords) > 2 else 0,
+                    "elevation_m": coords[2] if len(coords) > 2 else 0,
+                    "provider": "WMO / NOAA AWC",
+                    "distance_km": dist_km,
+                    "temp_c": p.get("temp"),
+                    "dewp_c": p.get("dewp"),
+                    "wind_speed_kt": p.get("wspd", 0),
+                    "wind_dir": p.get("wdir", 0),
+                    "altim_hpa": p.get("altim", 1013),
+                    "flight_cat": p.get("fltcat", "VFR"),
+                    "raw_metar": p.get("rawOb", "")
+                })
+            stations.sort(key=lambda x: x["distance_km"])
+            return {"status": "ok", "count": len(stations), "stations": stations}
+    except Exception as e:
+        pass
+    return {"status": "ok", "count": 0, "stations": []}
 
 
 # =====================================================================
