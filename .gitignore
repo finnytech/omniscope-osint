@@ -57,3 +57,7 @@ Thumbs.db
 
 # Release artifacts (Unpacked build tree ignored; portable zip & APK tracked)
 releases/windows/OmniScope/
+
+releases/
+*.apk
+*.zip

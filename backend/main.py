@@ -1394,6 +1394,192 @@ async def ai_body_pose(payload: Dict[str, Any] = Body(...)):
 
 
 # =====================================================================
+# LIVE KEYLESS OPEN DATA PROVIDERS (v2.1.0 ZERO-FAKE DYNAMIC FEEDS)
+# =====================================================================
+
+@app.get("/api/cyber/cables")
+async def get_submarine_cables():
+    try:
+        r = await http_client.get(
+            "https://www.submarinecablemap.com/api/v3/cable/cable-geo.json",
+            headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36", "Referer": "https://www.submarinecablemap.com/"}
+        )
+        return Response(content=r.content, media_type="application/json")
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Submarine cable upstream error: {str(e)}")
+
+@app.get("/api/cyber/landing-points")
+async def get_submarine_landing_points():
+    try:
+        r = await http_client.get(
+            "https://www.submarinecablemap.com/api/v3/landing-point/landing-point-geo.json",
+            headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36", "Referer": "https://www.submarinecablemap.com/"}
+        )
+        return Response(content=r.content, media_type="application/json")
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Landing points upstream error: {str(e)}")
+
+@app.get("/api/cyber/cable-detail")
+async def get_submarine_cable_detail(id: str = Query(...)):
+    try:
+        r = await http_client.get(
+            f"https://www.submarinecablemap.com/api/v3/cable/{id.strip().lower()}.json",
+            headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36", "Referer": "https://www.submarinecablemap.com/"}
+        )
+        return Response(content=r.content, media_type="application/json")
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Cable detail upstream error: {str(e)}")
+
+@app.get("/api/cyber/tor-relays")
+async def get_tor_relays(limit: int = 100):
+    try:
+        limit_val = min(max(limit, 10), 300)
+        r = await http_client.get(
+            f"https://onionoo.torproject.org/details?type=relay&running=true&limit={limit_val}",
+            headers={"User-Agent": "OmniScope-OSINT/2.1 (contact@omniscope.local)"}
+        )
+        return Response(content=r.content, media_type="application/json")
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Tor Onionoo upstream error: {str(e)}")
+
+@app.get("/api/disasters/gdacs")
+async def get_gdacs_disasters():
+    try:
+        r = await http_client.get(
+            "https://www.gdacs.org/gdacsapi/api/events/geteventlist/SEARCH?eventtypes=EQ,TC,FL,VO,DR",
+            headers={"User-Agent": "Mozilla/5.0"}
+        )
+        return Response(content=r.content, media_type="application/json")
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"GDACS upstream error: {str(e)}")
+
+@app.get("/api/radiation/safecast")
+async def get_safecast_radiation(limit: int = 100):
+    try:
+        r = await http_client.get(
+            "https://radmon.org/radmon.php?function=getcombinedlistjson",
+            headers={"User-Agent": "Mozilla/5.0"}
+        )
+        if r.status_code == 200:
+            raw = r.json()
+            if isinstance(raw, list) and len(raw) >= 12:
+                names = raw[0]
+                cities = raw[1]
+                detectors = raw[2]
+                cpms = raw[7]
+                lats = raw[10]
+                lons = raw[11]
+                results = []
+                for i in range(len(names)):
+                    try:
+                        lat = float(lats[i])
+                        lon = float(lons[i])
+                        cpm = float(cpms[i])
+                        if lat != 0 or lon != 0:
+                            results.append({
+                                "id": f"geiger-{names[i]}",
+                                "station": names[i],
+                                "city": cities[i] or "Global Station",
+                                "device": detectors[i] or "Geiger-Müller Tube",
+                                "value": cpm,
+                                "unit": "cpm",
+                                "latitude": lat,
+                                "longitude": lon,
+                                "captured_at": datetime.now(timezone.utc).isoformat(),
+                                "source": "Radmon.org Global Geiger Network"
+                            })
+                    except (ValueError, TypeError):
+                        continue
+                return results
+    except Exception:
+        pass
+    try:
+        limit_val = min(max(limit, 10), 200)
+        r = await http_client.get(
+            f"https://api.safecast.org/measurements.json?limit={limit_val}",
+            headers={"User-Agent": "Mozilla/5.0"}
+        )
+        return Response(content=r.content, media_type="application/json")
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Radiation upstream error: {str(e)}")
+
+@app.get("/api/maritime/baltic-ais")
+async def get_baltic_ais():
+    try:
+        r = await http_client.get(
+            "https://meri.digitraffic.fi/api/ais/v1/locations",
+            headers={"User-Agent": "OmniScope-OSINT/2.1", "Accept": "application/json"}
+        )
+        return Response(content=r.content, media_type="application/json")
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Baltic AIS upstream error: {str(e)}")
+
+@app.get("/api/aviation/airports")
+async def get_faa_airport_status():
+    try:
+        r = await http_client.get(
+            "https://nasstatus.faa.gov/api/airport-status-information",
+            headers={"User-Agent": "Mozilla/5.0"}
+        )
+        return Response(content=r.content, media_type="application/xml")
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"FAA Airport status error: {str(e)}")
+
+@app.get("/api/aviation/metar")
+async def get_aviation_metar(ids: str = "KJFK,KLAX,KORD,KATL,EGLL,LFPG,EDDF,EHAM,RJTT,OMDB,VHHH,WSSS,YSSY,SBGR,FACT"):
+    try:
+        r = await http_client.get(
+            f"https://aviationweather.gov/api/data/metar?ids={ids}&format=json",
+            headers={"User-Agent": "Mozilla/5.0"}
+        )
+        return Response(content=r.content, media_type="application/json")
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Aviation weather error: {str(e)}")
+
+@app.get("/api/rf/kiwisdr")
+async def get_kiwisdr_receivers():
+    try:
+        r = await http_client.get(
+            "http://rx.linkfanel.net/kiwisdr_com.js",
+            headers={"User-Agent": "OmniScope-OSINT/2.1"}
+        )
+        body = r.text
+        s = body.find("[")
+        e = body.rfind("]")
+        if s == -1 or e == -1:
+            raise ValueError("Invalid KiwiSDR format")
+        import json, re
+        raw = re.sub(r",\s*\]", "]", body[s:e+1])
+        arr = json.loads(raw)
+        active = [x for x in arr if x.get("status") == "active" and x.get("offline") != "yes" and x.get("gps")]
+        return {"status": "ok", "total_active": len(active), "receivers": active}
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"KiwiSDR error: {str(e)}")
+
+@app.get("/api/borders/wait-times")
+async def get_border_wait_times():
+    try:
+        r = await http_client.get(
+            "https://bwt.cbp.gov/api/bwtpublicmod",
+            headers={"User-Agent": "Mozilla/5.0"}
+        )
+        return Response(content=r.content, media_type="application/json")
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Border wait times error: {str(e)}")
+
+@app.get("/api/space/asteroids")
+async def get_near_earth_asteroids(dist_max: str = "0.05", limit: int = 25):
+    try:
+        r = await http_client.get(
+            f"https://ssd-api.jpl.nasa.gov/cad.api?dist-max={dist_max}&limit={limit}",
+            headers={"User-Agent": "Mozilla/5.0"}
+        )
+        return Response(content=r.content, media_type="application/json")
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"JPL CAD error: {str(e)}")
+
+
+# =====================================================================
 # STATIC FRONTEND SERVING
 # =====================================================================
 
