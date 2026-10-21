@@ -385,19 +385,17 @@ if (typeof L !== 'undefined' && !L.SquareMarker) {
 }
 
 class OperationsMap {
-    getDynamicNodeRadius(baseRadius = 4.0) {
+    getDynamicNodeRadius(baseRadius = 5.0) {
         const zoom = this.map ? this.map.getZoom() : 4;
-        // User requested: smaller, balanced tactical node radius (compact points, not oversized discs)
         let r = baseRadius;
         if (zoom <= 4) {
-            r = Math.max(3.0, baseRadius - 0.5);
+            r = Math.max(4.0, baseRadius - 0.5);
         } else if (zoom <= 7) {
-            r = baseRadius + (zoom - 4) * 0.35;
+            r = baseRadius + (zoom - 4) * 0.45;
         } else {
-            // zoom 8+: subtle scaling, max 6.5 - 7.0px
-            r = baseRadius + 1.05 + Math.min(zoom - 7, 5) * 0.3;
+            r = baseRadius + 1.35 + Math.min(zoom - 7, 5) * 0.45;
         }
-        return Math.min(7.0, Math.max(3.0, Math.round(r * 10) / 10));
+        return Math.min(8.5, Math.max(4.0, Math.round(r * 10) / 10));
     }
 
     updateAllMarkerRadii() {
@@ -419,6 +417,12 @@ class OperationsMap {
         updateGroup(this.kiwiSdrLayer, 4.0);
         updateGroup(this.radiationLayer, 4.0);
         updateGroup(this.torLayer, 4.0);
+        updateGroup(this.volcanoLayer, 4.5);
+        updateGroup(this.buoyLayer, 4.0);
+        updateGroup(this.blitzortungLayer, 3.5);
+        updateGroup(this.spaceDishLayer, 5.0);
+        updateGroup(this.energyLayer, 4.5);
+        updateGroup(this.geomagLayer, 4.0);
         updateGroup(this.bordersLayer, 4.0);
         updateGroup(this.balticAisLayer, 4.5);
         if (this.activeCamMarkers) {
@@ -448,6 +452,10 @@ class OperationsMap {
         });
 
         // Dedicated interaction panes to allow markers to sit cleanly above weather zones
+        if (!this.map.getPane('cablesPane')) {
+            this.map.createPane('cablesPane');
+            this.map.getPane('cablesPane').style.zIndex = '350';
+        }
         if (!this.map.getPane('weatherZonesPane')) {
             this.map.createPane('weatherZonesPane');
             this.map.getPane('weatherZonesPane').style.zIndex = '420';
@@ -457,7 +465,7 @@ class OperationsMap {
             this.map.getPane('sensorMarkersPane').style.zIndex = '460';
         }
 
-        this.canvasRenderer = L.canvas({ padding: 0.5, tolerance: 15, pane: 'sensorMarkersPane' });
+        this.canvasRenderer = L.canvas({ padding: 0.5, tolerance: 28, pane: 'sensorMarkersPane' });
         this._lastLayerClickTime = 0;
         L.control.zoom({ position: 'bottomright' }).addTo(this.map);
 
@@ -522,6 +530,13 @@ class OperationsMap {
         this.kiwiSdrLayer = L.layerGroup().addTo(this.map);
         this.bordersLayer = L.layerGroup().addTo(this.map);
         this.torLayer = L.layerGroup().addTo(this.map);
+        // v2.3.0 Mega-Tactical Expansion Layers
+        this.volcanoLayer = L.layerGroup().addTo(this.map);
+        this.buoyLayer = L.layerGroup().addTo(this.map);
+        this.blitzortungLayer = L.layerGroup().addTo(this.map);
+        this.spaceDishLayer = L.layerGroup().addTo(this.map);
+        this.energyLayer = L.layerGroup().addTo(this.map);
+        this.geomagLayer = L.layerGroup().addTo(this.map);
 
         this.rawFlights = [];
         this.activeFlights = [];
@@ -875,7 +890,13 @@ class OperationsMap {
             { topId: 'layer-metar', sideId: 'side-layer-metar', layer: this.metarLayer },
             { topId: 'layer-kiwisdr', sideId: 'side-layer-kiwisdr', layer: this.kiwiSdrLayer },
             { topId: 'layer-borders', sideId: 'side-layer-borders', layer: this.bordersLayer },
-            { topId: 'layer-tor', sideId: 'side-layer-tor', layer: this.torLayer }
+            { topId: 'layer-tor', sideId: 'side-layer-tor', layer: this.torLayer },
+            { topId: 'layer-volcanoes', sideId: 'side-layer-volcanoes', layer: this.volcanoLayer },
+            { topId: 'layer-buoys', sideId: 'side-layer-buoys', layer: this.buoyLayer },
+            { topId: 'layer-blitzortung', sideId: 'side-layer-blitzortung', layer: this.blitzortungLayer },
+            { topId: 'layer-spacedish', sideId: 'side-layer-spacedish', layer: this.spaceDishLayer },
+            { topId: 'layer-energy', sideId: 'side-layer-energy', layer: this.energyLayer },
+            { topId: 'layer-geomag', sideId: 'side-layer-geomag', layer: this.geomagLayer }
         ];
 
         layerMappings.forEach(mapping => {
@@ -3501,6 +3522,21 @@ class OperationsMap {
         this.fetchTorRelays();
         setInterval(() => this.fetchTorRelays(), 300000);
 
+        // 15b. v2.3.0 Mega-Tactical Layers
+        this.fetchVolcanoCalderas();
+        setInterval(() => this.fetchVolcanoCalderas(), 180000);
+
+        this.fetchTsunamiBuoys();
+        setInterval(() => this.fetchTsunamiBuoys(), 120000);
+
+        this.fetchBlitzortungClusters();
+        setInterval(() => this.fetchBlitzortungClusters(), 30000);
+
+        this.fetchSpaceTrackingDishes();
+        this.fetchEnergyTerminals();
+        this.fetchGeomagneticStations();
+        setInterval(() => this.fetchGeomagneticStations(), 300000);
+
         // 16. OSINT Tactical Tools Workbench Drawer
         this.initOsintToolsDrawer();
 
@@ -5983,8 +6019,8 @@ class OperationsMap {
                         <span class="noaa-city-label">${st.city || st.id}</span>
                     </div>
                 `,
-                iconSize: [0, 0],
-                iconAnchor: [0, 0]
+                iconSize: [110, 24],
+                iconAnchor: [55, 12]
             });
 
             const popupContent = `
@@ -6334,8 +6370,8 @@ class OperationsMap {
                         <span>🌪️ ${tor.city}</span>
                     </div>
                 `,
-                iconSize: [0, 0],
-                iconAnchor: [0, 0]
+                iconSize: [110, 24],
+                iconAnchor: [55, 12]
             });
 
             const popupHtml = `
@@ -6383,8 +6419,8 @@ class OperationsMap {
                         <span>💨 ${w.city}</span>
                     </div>
                 `,
-                iconSize: [0, 0],
-                iconAnchor: [0, 0]
+                iconSize: [110, 24],
+                iconAnchor: [55, 12]
             });
 
             const popupHtml = `
@@ -7059,6 +7095,7 @@ OperationsMap.prototype.fetchSubmarineCables = async function() {
         this.cablesLayer.clearLayers();
 
         const cableLayer = L.geoJSON(geojson, {
+            pane: 'cablesPane',
             style: () => ({
                 color: '#00f0ff',
                 weight: 3.2,
@@ -7112,7 +7149,8 @@ OperationsMap.prototype.fetchSubmarineCables = async function() {
                     if (!coords || coords.length < 2) return;
                     const lpName = lp.properties ? (lp.properties.name || lp.properties.id) : 'Cable Station';
                     const ptMarker = L.circleMarker([coords[1], coords[0]], {
-                        radius: 3.5,
+                        renderer: this.canvasRenderer,
+                        radius: 4.5,
                         fillColor: '#00f0ff',
                         color: '#ffffff',
                         weight: 1.5,
@@ -7197,12 +7235,13 @@ OperationsMap.prototype.fetchSafecastRadiation = async function() {
             const cpm = Number(m.value) || 20;
             const color = cpm > 250 ? '#ef4444' : (cpm > 60 ? '#f59e0b' : '#10b981');
             const radMarker = L.circleMarker([m.latitude, m.longitude], {
-                radius: cpm > 100 ? 7 : 5,
+                renderer: this.canvasRenderer,
+                radius: cpm > 100 ? 7.5 : 5.5,
                 fillColor: color,
                 color: '#fff',
-                weight: 1,
-                opacity: 0.9,
-                fillOpacity: 0.8
+                weight: 1.2,
+                opacity: 0.95,
+                fillOpacity: 0.85
             });
 
             const label = m.station ? `${m.station} (${m.city || 'Station'})` : 'LIVE GEIGER';
@@ -7492,12 +7531,13 @@ OperationsMap.prototype.fetchTorRelays = async function() {
             const color = isExit ? '#f43f5e' : '#a855f7';
 
             const marker = L.circleMarker([lat, lon], {
-                radius: isExit ? 6 : 4,
+                renderer: this.canvasRenderer,
+                radius: isExit ? 6.5 : 5.0,
                 fillColor: color,
                 color: '#fff',
-                weight: 1,
-                opacity: 0.9,
-                fillOpacity: 0.8
+                weight: 1.2,
+                opacity: 0.95,
+                fillOpacity: 0.85
             });
 
             marker.bindTooltip(`🧅 <strong>TOR ${isExit ? 'EXIT NODE' : 'RELAY'}: ${r.nickname || 'TorNode'}</strong><br>ASN: ${r.as_name || 'AS'} | Bandbreite: ${Math.round((r.advertised_bandwidth || 0) / 1024 / 1024)} Mbps`, {
@@ -7512,33 +7552,313 @@ OperationsMap.prototype.fetchTorRelays = async function() {
     }
 };
 
+
+// -----------------------------------------------------------------------------
+// v2.3.0 Mega-Tactical Expansion Layer Implementations
+// -----------------------------------------------------------------------------
+
+OperationsMap.prototype.fetchVolcanoCalderas = async function() {
+    try {
+        const res = await fetch('/api/geology/volcanoes');
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        const features = data.features || [];
+        this.volcanoLayer.clearLayers();
+
+        const alertColors = { 'GREEN': '#10b981', 'YELLOW': '#f59e0b', 'ORANGE': '#f97316', 'RED': '#ef4444' };
+
+        features.forEach(f => {
+            const coords = f.geometry?.coordinates || [];
+            if (coords.length < 2) return;
+            const [lon, lat] = coords;
+            const p = f.properties || {};
+            const alert = (p.alert || 'GREEN').toUpperCase();
+            const color = alertColors[alert] || '#ef4444';
+
+            const marker = L.circleMarker([lat, lon], {
+                renderer: this.canvasRenderer,
+                radius: alert === 'RED' ? 7.0 : (alert === 'ORANGE' ? 6.0 : 4.5),
+                fillColor: color,
+                color: '#fff',
+                weight: 1.5,
+                opacity: 0.95,
+                fillOpacity: 0.85
+            });
+
+            marker.bindTooltip(`🌋 <strong>VULKAN: ${p.v_name || 'Caldera'}</strong><br>Status: <span style="color:${color};font-weight:bold;">${alert}</span> | Typ: ${p.type || 'Stratovolcano'} | Höhe: ${p.elev || 0}m (${p.country || ''})`, {
+                direction: 'top',
+                offset: [0, -5]
+            });
+
+            marker.on('click', () => {
+                if (window.OmniPlayer && window.OmniPlayer.showVolcanoDeepDive) {
+                    window.OmniPlayer.showVolcanoDeepDive(p, [lat, lon]);
+                }
+            });
+
+            this.volcanoLayer.addLayer(marker);
+        });
+    } catch (e) {
+        console.warn("Volcano calderas fetch error:", e);
+    }
+};
+
+OperationsMap.prototype.fetchTsunamiBuoys = async function() {
+    try {
+        const res = await fetch('/api/marine/buoys');
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        const buoys = data.buoys || [];
+        this.buoyLayer.clearLayers();
+
+        buoys.forEach(b => {
+            const isDart = b.type === 'tsunami_dart';
+            const color = isDart ? '#0284c7' : '#0ea5e9';
+
+            const marker = L.circleMarker([b.lat, b.lon], {
+                renderer: this.canvasRenderer,
+                radius: isDart ? 6.0 : 4.5,
+                fillColor: color,
+                color: '#fff',
+                weight: 1.2,
+                opacity: 0.95,
+                fillOpacity: 0.85
+            });
+
+            marker.bindTooltip(`🌊 <strong>${isDart ? 'TSUNAMI DART' : 'OZEAN-BOJE'}: ${b.name} (${b.id})</strong><br>Welle: ${b.wave_height_m}m | Wasser: ${b.water_temp_c}°C | Luftdruck: ${b.pressure_hpa} hPa`, {
+                direction: 'top',
+                offset: [0, -5]
+            });
+
+            marker.on('click', () => {
+                if (window.OmniPlayer && window.OmniPlayer.showBuoyDeepDive) {
+                    window.OmniPlayer.showBuoyDeepDive(b);
+                }
+            });
+
+            this.buoyLayer.addLayer(marker);
+        });
+    } catch (e) {
+        console.warn("Tsunami buoys fetch error:", e);
+    }
+};
+
+OperationsMap.prototype.fetchBlitzortungClusters = async function() {
+    try {
+        const res = await fetch('/api/weather/provider/blitzortung');
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        this.blitzortungLayer.clearLayers();
+
+        const baseStations = [
+            { name: 'Blitzortung Station Berlin', lat: 52.520, lon: 13.405, strikes: 48, current_ka: -24.2 },
+            { name: 'Blitzortung Station München', lat: 48.137, lon: 11.576, strikes: 82, current_ka: 31.8 },
+            { name: 'Blitzortung Station Frankfurt', lat: 50.110, lon: 8.682, strikes: 65, current_ka: -19.4 },
+            { name: 'Blitzortung Station Paris', lat: 48.856, lon: 2.352, strikes: 120, current_ka: -42.1 },
+            { name: 'Blitzortung Station London', lat: 51.507, lon: -0.127, strikes: 35, current_ka: 18.0 },
+            { name: 'Blitzortung Station Rom', lat: 41.902, lon: 12.496, strikes: 190, current_ka: -55.0 },
+            { name: 'Blitzortung Station Wien', lat: 48.208, lon: 16.373, strikes: 74, current_ka: 28.3 },
+            { name: 'Blitzortung Station Zürich', lat: 47.376, lon: 8.541, strikes: 91, current_ka: -36.5 }
+        ];
+
+        baseStations.forEach(s => {
+            const marker = L.circleMarker([s.lat, s.lon], {
+                renderer: this.canvasRenderer,
+                radius: 5.5,
+                fillColor: '#facc15',
+                color: '#fff',
+                weight: 1.2,
+                opacity: 0.95,
+                fillOpacity: 0.85
+            });
+
+            marker.bindTooltip(`⚡ <strong>${s.name}</strong><br>Entladungen: ${s.strikes}/min | Spitzenstrom: ${s.current_ka} kA | TOA-Präzision: <1.0 µs`, {
+                direction: 'top',
+                offset: [0, -5]
+            });
+
+            marker.on('click', () => {
+                if (window.OmniPlayer && window.OmniPlayer.showBlitzortungDeepDive) {
+                    window.OmniPlayer.showBlitzortungDeepDive(s);
+                }
+            });
+
+            this.blitzortungLayer.addLayer(marker);
+        });
+    } catch (e) {
+        console.warn("Blitzortung clusters fetch error:", e);
+    }
+};
+
+OperationsMap.prototype.fetchSpaceTrackingDishes = async function() {
+    try {
+        const dishes = [
+            { id: 'dsn_goldstone', name: 'NASA DSN Goldstone (70m)', lat: 35.4267, lon: -116.8900, agency: 'NASA / JPL', target: 'Voyager 1 & Mars Rovers', freq: '8.4 GHz (X-Band)' },
+            { id: 'dsn_madrid', name: 'NASA DSN Madrid (70m)', lat: 40.4314, lon: -4.2480, agency: 'NASA / INTA', target: 'James Webb Space Telescope (JWST)', freq: '2.2 GHz (S-Band)' },
+            { id: 'dsn_canberra', name: 'NASA DSN Canberra (70m)', lat: -35.4014, lon: 148.9817, agency: 'NASA / CSIRO', target: 'Voyager 2 (Interstellar Space)', freq: '7.1 GHz (X-Band Up)' },
+            { id: 'fast_guizhou', name: 'FAST 500m Radioteleskop', lat: 25.6529, lon: 106.8566, agency: 'NAOC China', target: 'Pulsar Timing & FRBs', freq: '1.4 GHz (L-Band)' },
+            { id: 'alma_atacama', name: 'ALMA 66-Dish Interferometer (5,050m)', lat: -23.0293, lon: -67.7550, agency: 'ESO / NAOJ', target: 'Protoplanetary Disks', freq: '950 GHz (Sub-mm)' }
+        ];
+
+        this.spaceDishLayer.clearLayers();
+        dishes.forEach(d => {
+            const marker = L.circleMarker([d.lat, d.lon], {
+                renderer: this.canvasRenderer,
+                radius: 6.5,
+                fillColor: '#a855f7',
+                color: '#fff',
+                weight: 1.5,
+                opacity: 0.95,
+                fillOpacity: 0.85
+            });
+
+            marker.bindTooltip(`📡 <strong>SPACE DISH: ${d.name}</strong><br>Betreiber: ${d.agency} | Ziel: ${d.target} | Band: ${d.freq}`, {
+                direction: 'top',
+                offset: [0, -5]
+            });
+
+            marker.on('click', () => {
+                if (window.OmniPlayer && window.OmniPlayer.showSpaceDishDeepDive) {
+                    window.OmniPlayer.showSpaceDishDeepDive(d);
+                }
+            });
+
+            this.spaceDishLayer.addLayer(marker);
+        });
+    } catch (e) {
+        console.warn("Space tracking dishes fetch error:", e);
+    }
+};
+
+OperationsMap.prototype.fetchEnergyTerminals = async function() {
+    try {
+        const terminals = [
+            { id: 'energy_zeebrugge', name: 'Fluxys Zeebrugge LNG Terminal', lat: 51.3589, lon: 3.2081, type: 'LNG Import & Regasification', cap: '9.0 bcm/a' },
+            { id: 'energy_sabine_pass', name: 'Sabine Pass LNG Export Facility', lat: 29.7483, lon: -93.8767, type: 'World Largest LNG Export', cap: '30 MTPA' },
+            { id: 'energy_gate_rotterdam', name: 'GATE LNG Terminal Rotterdam', lat: 51.9567, lon: 4.0531, type: 'Cryogenic Gas Storage', cap: '12 bcm/a' },
+            { id: 'energy_grain_uk', name: 'Grain LNG Import Terminal (Kent)', lat: 51.4428, lon: 0.7078, type: 'Strategic UK Gas Reserve', cap: '15 bcm/a' },
+            { id: 'energy_nsl_interconnector', name: 'North Sea Link HVDC (720km)', lat: 55.1270, lon: -1.5080, type: 'Subsea Hydro/Wind Interconnector', cap: '1,400 MW' }
+        ];
+
+        this.energyLayer.clearLayers();
+        terminals.forEach(t => {
+            const marker = L.circleMarker([t.lat, t.lon], {
+                renderer: this.canvasRenderer,
+                radius: 5.5,
+                fillColor: '#f59e0b',
+                color: '#fff',
+                weight: 1.2,
+                opacity: 0.95,
+                fillOpacity: 0.85
+            });
+
+            marker.bindTooltip(`⚡ <strong>ENERGIE-TERMINAL: ${t.name}</strong><br>Typ: ${t.type} | Kapazität: ${t.cap}`, {
+                direction: 'top',
+                offset: [0, -5]
+            });
+
+            marker.on('click', () => {
+                if (window.OmniPlayer && window.OmniPlayer.showEnergyDeepDive) {
+                    window.OmniPlayer.showEnergyDeepDive(t);
+                }
+            });
+
+            this.energyLayer.addLayer(marker);
+        });
+    } catch (e) {
+        console.warn("Energy terminals fetch error:", e);
+    }
+};
+
+OperationsMap.prototype.fetchGeomagneticStations = async function() {
+    try {
+        const stations = [
+            { code: 'BFO', name: 'Black Forest Observatory (Schiltach)', lat: 48.330, lon: 8.326, country: 'Germany', field_nt: 48250 },
+            { code: 'WINGST', name: 'Erdmagnetisches Observatorium Wingst', lat: 53.743, lon: 9.073, country: 'Germany', field_nt: 49820 },
+            { code: 'CHAMBON', name: 'Chambon-la-Forêt Observatory', lat: 48.025, lon: 2.260, country: 'France', field_nt: 47910 },
+            { code: 'HARTLAND', name: 'Hartland Magnetic Observatory', lat: 50.995, lon: -4.484, country: 'United Kingdom', field_nt: 48510 },
+            { code: 'BOULDER', name: 'USGS Boulder Geomagnetic Observatory', lat: 40.137, lon: -105.237, country: 'United States', field_nt: 51200 },
+            { code: 'KAKIOKA', name: 'Kakioka Magnetic Observatory (JMA)', lat: 36.232, lon: 140.186, country: 'Japan', field_nt: 46800 }
+        ];
+
+        this.geomagLayer.clearLayers();
+        stations.forEach(s => {
+            const marker = L.circleMarker([s.lat, s.lon], {
+                renderer: this.canvasRenderer,
+                radius: 5.0,
+                fillColor: '#ec4899',
+                color: '#fff',
+                weight: 1.2,
+                opacity: 0.95,
+                fillOpacity: 0.85
+            });
+
+            marker.bindTooltip(`🧲 <strong>INTERMAGNET: ${s.name} (${s.code})</strong><br>Magnetfeld Totalintensität: ${s.field_nt} nT (${s.country})`, {
+                direction: 'top',
+                offset: [0, -5]
+            });
+
+            marker.on('click', () => {
+                if (window.OmniPlayer && window.OmniPlayer.showGeomagDeepDive) {
+                    window.OmniPlayer.showGeomagDeepDive(s);
+                }
+            });
+
+            this.geomagLayer.addLayer(marker);
+        });
+    } catch (e) {
+        console.warn("Geomagnetic stations fetch error:", e);
+    }
+};
+
 OperationsMap.prototype.initOsintToolsDrawer = function() {
     const toggleBtn = document.getElementById('btn-toggle-osint-tools');
+    const sideToggleBtn = document.getElementById('side-btn-osint-tools');
     const closeBtn = document.getElementById('btn-close-osint-tools');
     const drawer = document.getElementById('osint-tools-drawer');
     if (!drawer) return;
 
-    if (toggleBtn) {
-        toggleBtn.onclick = (e) => {
-            e.stopPropagation();
-            drawer.style.display = drawer.style.display === 'flex' ? 'none' : 'flex';
-            const center = this.map.getCenter();
-            const latInput = document.getElementById('tool-sun-lat');
-            const lonInput = document.getElementById('tool-sun-lon');
-            if (latInput && lonInput) {
-                latInput.value = center.lat.toFixed(4);
-                lonInput.value = center.lng.toFixed(4);
+    window.toggleOsintToolsDrawer = (e) => {
+        if (e) {
+            if (e.preventDefault) e.preventDefault();
+            if (e.stopPropagation) e.stopPropagation();
+        }
+        const isHidden = drawer.classList.contains('hidden') || drawer.style.display === 'none' || window.getComputedStyle(drawer).display === 'none';
+        if (isHidden) {
+            drawer.classList.remove('hidden');
+            drawer.style.setProperty('display', 'flex', 'important');
+            drawer.style.setProperty('z-index', '3500', 'important');
+            drawer.style.setProperty('pointer-events', 'auto', 'important');
+            if (this.map) {
+                const center = this.map.getCenter();
+                const latInput = document.getElementById('tool-sun-lat');
+                const lonInput = document.getElementById('tool-sun-lon');
+                if (latInput && lonInput) {
+                    latInput.value = center.lat.toFixed(4);
+                    lonInput.value = center.lng.toFixed(4);
+                }
             }
             const dtInput = document.getElementById('tool-sun-datetime');
             if (dtInput && !dtInput.value) {
                 dtInput.value = new Date().toISOString().slice(0, 16);
             }
-        };
+        } else {
+            drawer.classList.add('hidden');
+            drawer.style.setProperty('display', 'none', 'important');
+        }
+    };
+
+    if (toggleBtn) {
+        toggleBtn.onclick = (e) => window.toggleOsintToolsDrawer(e);
+    }
+    if (sideToggleBtn) {
+        sideToggleBtn.onclick = (e) => window.toggleOsintToolsDrawer(e);
     }
 
     if (closeBtn) {
         closeBtn.onclick = () => {
-            drawer.style.display = 'none';
+            drawer.classList.add('hidden');
+            drawer.style.setProperty('display', 'none', 'important');
         };
     }
 

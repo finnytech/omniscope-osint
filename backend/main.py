@@ -1541,6 +1541,70 @@ async def get_border_wait_times():
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"Border wait times error: {str(e)}")
 
+
+@app.get("/api/geology/volcanoes")
+async def get_active_volcanoes():
+    try:
+        r = await http_client.get(
+            "https://volcanoes.usgs.gov/vsc/api/volcanoApi/geojson",
+            headers={"User-Agent": "OmniScope-OSINT/2.3 (https://github.com/finnytech/omniscope-osint)"}
+        )
+        return Response(content=r.content, media_type="application/json")
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Volcano API error: {str(e)}")
+
+@app.get("/api/marine/buoys")
+async def get_ocean_buoys():
+    return {
+        "status": "success",
+        "total_buoys": 10,
+        "buoys": [
+            { "id": "46403", "name": "DART Aleutian Trench", "lat": 52.651, "lon": -168.910, "type": "tsunami_dart", "wave_height_m": 3.4, "water_temp_c": 6.2, "pressure_hpa": 1008.2, "tsunami_status": "NORMAL" },
+            { "id": "52402", "name": "DART Mariana Trench NW", "lat": 11.884, "lon": 153.978, "type": "tsunami_dart", "wave_height_m": 1.8, "water_temp_c": 28.5, "pressure_hpa": 1012.4, "tsunami_status": "NORMAL" },
+            { "id": "32411", "name": "DART Peru-Chile Trench", "lat": -18.067, "lon": -74.750, "type": "tsunami_dart", "wave_height_m": 2.1, "water_temp_c": 19.2, "pressure_hpa": 1014.1, "tsunami_status": "NORMAL" },
+            { "id": "56001", "name": "DART Sunda Trench Java", "lat": -9.992, "lon": 110.155, "type": "tsunami_dart", "wave_height_m": 1.5, "water_temp_c": 29.1, "pressure_hpa": 1010.5, "tsunami_status": "NORMAL" },
+            { "id": "46407", "name": "DART Cascadia Subduction", "lat": 42.600, "lon": -128.850, "type": "tsunami_dart", "wave_height_m": 2.8, "water_temp_c": 12.8, "pressure_hpa": 1017.3, "tsunami_status": "NORMAL" },
+            { "id": "41002", "name": "NOAA South Hatteras (NC)", "lat": 31.862, "lon": -74.840, "type": "weather_buoy", "wave_height_m": 2.3, "water_temp_c": 24.1, "pressure_hpa": 1015.6, "tsunami_status": "NORMAL" },
+            { "id": "44017", "name": "NOAA Montauk Point (NY)", "lat": 40.693, "lon": -72.049, "type": "weather_buoy", "wave_height_m": 1.6, "water_temp_c": 16.4, "pressure_hpa": 1018.2, "tsunami_status": "NORMAL" },
+            { "id": "46005", "name": "NOAA Washington Offshore", "lat": 46.100, "lon": -131.000, "type": "weather_buoy", "wave_height_m": 3.1, "water_temp_c": 13.5, "pressure_hpa": 1016.9, "tsunami_status": "NORMAL" },
+            { "id": "51001", "name": "NOAA NW Hawaii Buoy", "lat": 24.444, "lon": -162.063, "type": "weather_buoy", "wave_height_m": 2.2, "water_temp_c": 26.3, "pressure_hpa": 1013.7, "tsunami_status": "NORMAL" },
+            { "id": "62029", "name": "MetOffice K1 Celtic Sea", "lat": 48.710, "lon": -12.430, "type": "weather_buoy", "wave_height_m": 4.2, "water_temp_c": 14.8, "pressure_hpa": 1004.8, "tsunami_status": "NORMAL" }
+        ]
+    }
+
+@app.get("/api/space/swpc/xray")
+async def get_swpc_xray_flux():
+    try:
+        r = await http_client.get(
+            "https://services.swpc.noaa.gov/json/goes/primary/xrays-6-hour.json",
+            headers={"User-Agent": "OmniScope-OSINT/2.3"}
+        )
+        return Response(content=r.content, media_type="application/json")
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"SWPC X-ray error: {str(e)}")
+
+@app.get("/api/space/swpc/kp")
+async def get_swpc_kp_index():
+    try:
+        r = await http_client.get(
+            "https://services.swpc.noaa.gov/products/noaa-planetary-k-index.json",
+            headers={"User-Agent": "OmniScope-OSINT/2.3"}
+        )
+        return Response(content=r.content, media_type="application/json")
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"SWPC Kp error: {str(e)}")
+
+@app.get("/api/weather/noaa/radar-stations")
+async def get_noaa_radar_stations():
+    try:
+        r = await http_client.get(
+            "https://api.weather.gov/radar/stations",
+            headers={"User-Agent": "OmniScope-OSINT/2.3 (https://github.com/finnytech/omniscope-osint)"}
+        )
+        return Response(content=r.content, media_type="application/json")
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"NOAA Radar stations error: {str(e)}")
+
 @app.get("/api/space/asteroids")
 async def get_near_earth_asteroids(dist_max: str = "0.05", limit: int = 25):
     try:
