@@ -2,6 +2,10 @@
 **Private High-Performance OSINT & Tactical Command Center**
 Developed by FinnyTech • Architecture: Native Python FastAPI + SQLite Spatial DB + Model Context Protocol (MCP)
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](LICENSE)
+[![Code of Conduct](https://img.shields.io/badge/Contributor%20Covenant-2.1-4baaaa.svg?style=for-the-badge)](CODE_OF_CONDUCT.md)
+
+
 ---
 
 ## Architecture & Capabilities
