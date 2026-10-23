@@ -3,7 +3,8 @@
 Developed by [FinnyTech](https://github.com/finnytech) • Architecture: Native Python FastAPI + SQLite Spatial DB + Model Context Protocol (MCP)
 
 [![Cloudflare Pages Live](https://img.shields.io/badge/Live-omniscope--web.pages.dev-blue?style=for-the-badge)](https://omniscope-web.pages.dev)
-[![Vercel Live](https://img.shields.io/badge/Live-omniscope--web.vercel.app-black?style=for-the-badge&logo=vercel)](https://omniscope-web.vercel.app/)
+[![Deployed with Vercel](https://img.shields.io/badge/Deployed%20with-Vercel-000000?style=for-the-badge&logo=vercel&logoColor=white)](https://app.finnytech.eu.org)
+[![Vercel Live](https://img.shields.io/badge/Live-app.finnytech.eu.org-black?style=for-the-badge&logo=vercel)](https://app.finnytech.eu.org)
 [![Worker Live](https://img.shields.io/badge/Live-Cloudflare%20Worker-F38020?style=for-the-badge&logo=cloudflare)](https://omniscope-web.fuchsdany1984.workers.dev/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](LICENSE)
 [![Code of Conduct](https://img.shields.io/badge/Contributor%20Covenant-2.1-4baaaa.svg?style=for-the-badge)](CODE_OF_CONDUCT.md)
@@ -12,7 +13,7 @@ Developed by [FinnyTech](https://github.com/finnytech) • Architecture: Native 
 
 ## 🌐 Live Web Deployments & Mirror Endpoints
 - **Cloudflare Pages Production**: [https://omniscope-web.pages.dev](https://omniscope-web.pages.dev)
-- **Vercel Global Deployment**: [https://omniscope-web.vercel.app/](https://omniscope-web.vercel.app/)
+- **Vercel Global Deployment**: [https://app.finnytech.eu.org](https://app.finnytech.eu.org)
 - **Cloudflare Anycast Edge Worker API**: [https://omniscope-web.fuchsdany1984.workers.dev/](https://omniscope-web.fuchsdany1984.workers.dev/)
 
 ---
