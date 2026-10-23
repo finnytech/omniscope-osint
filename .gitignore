@@ -61,3 +61,8 @@ releases/windows/OmniScope/
 releases/
 *.apk
 *.zip
+
+# Local deployment & automation scripts
+deploy.*
+*.ps1
+*.bat
