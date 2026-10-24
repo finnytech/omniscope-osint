@@ -1,3 +1,7 @@
+<div align="center">
+
+<img src="frontend/assets/logo-badge.png" alt="OmniScope OSINT Official Logo" width="210" style="border-radius: 22px; box-shadow: 0 0 28px rgba(0, 240, 255, 0.35);" />
+
 # 🌍 OmniScope OSINT [Native Edition]
 **High-Performance Geospatial Intelligence & Tactical Command Center**  
 Developed by [FinnyTech](https://github.com/finnytech) • Architecture: Native Python FastAPI + SQLite Spatial DB + Model Context Protocol (MCP)
@@ -5,15 +9,21 @@ Developed by [FinnyTech](https://github.com/finnytech) • Architecture: Native 
 [![Cloudflare Pages Live](https://img.shields.io/badge/Live-omniscope--web.pages.dev-blue?style=for-the-badge)](https://omniscope-web.pages.dev)
 [![Deployed with Vercel](https://img.shields.io/badge/Deployed%20with-Vercel-000000?style=for-the-badge&logo=vercel&logoColor=white)](https://omniscope-web.vercel.app)
 [![Vercel Live](https://img.shields.io/badge/Live-omniscope--web.vercel.app-black?style=for-the-badge&logo=vercel)](https://omniscope-web.vercel.app)
+[![Chrome Extension (MV3)](https://img.shields.io/badge/Chrome_Extension-Side_Panel_v2.6.0-00f0ff?style=for-the-badge&logo=googlechrome&logoColor=white)](https://github.com/finnytech/omniscope-extension)
 [![Worker Live](https://img.shields.io/badge/Live-Cloudflare%20Worker-F38020?style=for-the-badge&logo=cloudflare)](https://omniscope-web.fuchsdany1984.workers.dev/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=for-the-badge)](LICENSE)
 [![Code of Conduct](https://img.shields.io/badge/Contributor%20Covenant-2.1-4baaaa.svg?style=for-the-badge)](CODE_OF_CONDUCT.md)
 
+</div>
+
 ---
 
-## 🌐 Live Web Deployments & Mirror Endpoints
+## 🌐 Live Web Deployments, Chrome Extension & Ecosystem Links
 - **Cloudflare Pages Production**: [https://omniscope-web.pages.dev](https://omniscope-web.pages.dev)
 - **Vercel Global Deployment**: [https://omniscope-web.vercel.app](https://omniscope-web.vercel.app)
+- **Official Chrome Side Panel Extension (`v2.6.0`)**: [https://github.com/finnytech/omniscope-extension](https://github.com/finnytech/omniscope-extension)
+- **Official Web Repository**: [https://github.com/finnytech/omniscope-web](https://github.com/finnytech/omniscope-web)
+- **Official MCP Server Repository**: [https://github.com/finnytech/omniscope-mcp](https://github.com/finnytech/omniscope-mcp)
 - **Cloudflare Anycast Edge Worker API**: [https://omniscope-web.fuchsdany1984.workers.dev/](https://omniscope-web.fuchsdany1984.workers.dev/)
 
 ---
@@ -32,8 +42,8 @@ Developed by [FinnyTech](https://github.com/finnytech) • Architecture: Native 
   6. **KiwiSDR Radio Receivers**: 0–32 MHz HF radio receiver grid with in-app native audio deck and FFT spectrum waterfall.
   7. **Border Wait Times**: US Customs & Border Protection (CBP) commercial and passenger crossing telemetry.
   8. **Tor Network Relays**: Onionoo consensus routing and relay nodes.
-  9. **Radar & Meteorology**: NEXRAD Doppler composite loops and 147 WMO numerical weather models.
-  10. **Space & Orbital**: NASA JPL Close-Approach Asteroids & ISS orbital tracking.
+  9. **Radar & Meteorology**: NEXRAD Doppler composite loops, Sector Box-Scan, Historical ERA5 Tornado Archive (`1940–Present`), and 147 WMO numerical weather models.
+  10. **Space, Geomagnetic & Orbital**: 3-Axis Fluxgate Magnetometer Oscilloscope, NASA JPL Close-Approach Asteroids & ISS orbital tracking.
 - **Zero-Fake Guarantee**: 100% authentic, keyless scientific data feeds.
 
 ---
@@ -67,10 +77,11 @@ http://localhost:8000
 
 ---
 
-## 📦 Standalone Releases
-Pre-packaged standalone builds for Windows and Android are available on the [Releases Page](https://github.com/finnytech/omniscope-osint/releases):
-- **Windows Desktop:** `OmniScope-v2.4-Windows-x64.zip` (Native lightweight WebView2 runtime)
-- **Android APK:** `OmniScope-v2.4.apk` (Standalone signed APK)
+## 📦 Standalone Releases & Chrome Extension
+Pre-packaged standalone builds for Windows, Android, and Chrome are available:
+- **Chrome Side Panel Extension (`v2.6.0`):** [`https://github.com/finnytech/omniscope-extension`](https://github.com/finnytech/omniscope-extension) (Manifest V3 Side Panel HUD)
+- **Windows Desktop (`v2.5`):** `OmniScope-v2.5-Windows-x64.zip` (Native lightweight runtime with official Nano Banana 2.1 emblem)
+- **Android APK (`v2.5`):** `OmniScope-v2.5.apk` (Standalone signed APK with official Nano Banana 2.1 launcher icon)
 
 ---
 
