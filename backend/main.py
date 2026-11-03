@@ -17,6 +17,8 @@ import sys
 import json
 import httpx
 import logging
+import re
+import datetime
 from typing import Optional, Dict, Any, List
 from fastapi import FastAPI, HTTPException, Query, Request, Body, Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -120,7 +122,119 @@ async def health_check():
         }
     }
 
+
+# =====================================================================
+# STORM CHASERS ENDPOINT (LiveStormChasing + SpotterNetwork)
+# =====================================================================
+_chaser_cache = {"ts": 0, "data": None}
+
+@app.get("/api/chaser-cams")
+@app.get("/api/telemetry/chasers")
+async def get_chaser_cams():
+    import time
+    global _chaser_cache
+    now = time.time()
+    if _chaser_cache["data"] and (now - _chaser_cache["ts"] < 60):
+        return _chaser_cache["data"]
+
+    headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/124.0 Safari/537.36"}
+    chasers_map = {}
+
+    try:
+        async with httpx.AsyncClient(timeout=6.0) as client:
+            resp = await client.get("https://api.livestormchasing.com/api/v1/chasers?geojson=true", headers=headers)
+            if resp.status_code == 200:
+                data = resp.json()
+                for f in data.get("features", []):
+                    p = f.get("properties", {})
+                    c = f.get("geometry", {}).get("coordinates", [])
+                    name = p.get("name")
+                    if not name or len(c) < 2:
+                        continue
+                    stream = None
+                    if p.get("stream_status") and p.get("username"):
+                        stream = {
+                            "type": "hls",
+                            "url": f"https://edge.livestormchasing.com/hls/{p.get('username')}/index.m3u8",
+                            "verified": True
+                        }
+                    chasers_map[name.lower()] = {
+                        "id": f"lsc-{name.lower().replace(' ', '-')}",
+                        "name": name,
+                        "lat": c[1],
+                        "lon": c[0],
+                        "heading": p.get("heading"),
+                        "headingLabel": None,
+                        "speed": 0,
+                        "status": "STREAMING" if stream else "ACTIVE",
+                        "location": p.get("location"),
+                        "updated": p.get("gps_update"),
+                        "source": "LiveStormChasing",
+                        "twitter": None,
+                        "stream": stream
+                    }
+    except Exception as e:
+        pass
+
+    try:
+        async with httpx.AsyncClient(timeout=6.0) as client:
+            resp = await client.get("https://www.spotternetwork.org/feeds/gr.txt", headers=headers)
+            if resp.status_code == 200:
+                text_feed = resp.text
+                cur = None
+                for line in text_feed.splitlines():
+                    line = line.strip()
+                    if line.startswith("Object:"):
+                        coords = line.replace("Object:", "").strip().split(",")
+                        try:
+                            cur = {"lat": float(coords[0]), "lon": float(coords[1]), "tip": None}
+                        except:
+                            cur = None
+                    elif cur and line.startswith("Icon:"):
+                        m = re.search(r'"([^"]*)"', line)
+                        if m:
+                            cur["tip"] = m.group(1)
+                    elif line == "End:" and cur:
+                        if cur.get("tip"):
+                            parts = [s.strip() for s in cur["tip"].split("\\n")]
+                            name = parts[0] if parts else None
+                            if name and name.lower() not in chasers_map:
+                                hd_match = re.search(r'Heading:\s*([A-Z]+)\s*\((\d+)\)', cur["tip"])
+                                sp_match = re.search(r'Speed:\s*([\d.]+)', cur["tip"])
+                                tw_match = re.search(r'Twitter:\s*(https://[^\s"]+)', cur["tip"])
+                                chasers_map[name.lower()] = {
+                                    "id": f"sn-{name.lower().replace(' ', '-')}",
+                                    "name": name,
+                                    "lat": cur["lat"],
+                                    "lon": cur["lon"],
+                                    "heading": int(hd_match.group(2)) if hd_match else None,
+                                    "headingLabel": hd_match.group(1) if hd_match else None,
+                                    "speed": float(sp_match.group(1)) if sp_match else 0,
+                                    "status": "STATIONARY" if "STATIONARY" in cur["tip"] else "MOVING",
+                                    "location": None,
+                                    "updated": parts[1] if len(parts) > 1 else None,
+                                    "source": "Spotter Network",
+                                    "twitter": tw_match.group(1) if tw_match else None,
+                                    "stream": None
+                                }
+                        cur = None
+    except Exception as e:
+        pass
+
+    chasers_list = list(chasers_map.values())
+    result = {
+        "status": "ok",
+        "updatedAt": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        "count": len(chasers_list),
+        "streaming_count": sum(1 for c in chasers_list if c.get("stream")),
+        "chasers": chasers_list
+    }
+    if chasers_list:
+        _chaser_cache = {"ts": now, "data": result}
+    return result
+
 @app.get("/api/cameras/stats")
+
 async def get_camera_stats():
     """
     Returns exact node counts across real cameras, flock ALPR, telemetry, and weather stations.
