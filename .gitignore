@@ -66,3 +66,9 @@ releases/
 deploy.*
 *.ps1
 *.bat
+
+# Agent & Teamwork State
+.agents/
+agent.*/
+.agent/
+
