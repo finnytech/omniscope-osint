@@ -1781,35 +1781,46 @@ async def get_nearby_metar_stations(lat: float = 50.0, lon: float = 10.0, limit:
 # v2.9.0 KEYLESS STORM, MOBILE DOPPLER & APRS-IS ENDPOINTS
 # =====================================================================
 @app.get("/api/radarhub")
-async def get_radarhub(pathway: str = "", month: str = ""):
+async def get_radarhub(pathway: str = "", month: str = "", day: str = ""):
     from datetime import datetime, timezone
-    if not month:
-        month = datetime.now(timezone.utc).strftime("%Y-%m")
+    month = month.replace("-", "")
+    if not month or len(month) != 6:
+        month = datetime.now(timezone.utc).strftime("%Y%m")
     units_meta = [
-        {"id": "px1000", "name": "PX-1000 (Polarimetric X-Band)", "lat": 35.1818, "lon": -97.4394, "archiveUrl": "https://radarhub.arrc.ou.edu/archive/px1000/", "wsGroup": "PX-1000"},
-        {"id": "raxpol", "name": "RaXPol (Rapid-Scan Mobile Doppler)", "lat": 35.1818, "lon": -97.4394, "archiveUrl": "https://radarhub.arrc.ou.edu/archive/raxpol/", "wsGroup": "RaXPol"},
-        {"id": "px10k", "name": "PX-10k (High-Power X-Band)", "lat": 35.1818, "lon": -97.4394, "archiveUrl": "https://radarhub.arrc.ou.edu/archive/px10k/", "wsGroup": "PX-10k"},
-        {"id": "dlroof", "name": "Lidar-Roof (ARRC Doppler Lidar)", "lat": 35.1818, "lon": -97.4394, "archiveUrl": "https://radarhub.arrc.ou.edu/archive/dlroof/", "wsGroup": "Lidar-Roof"},
-        {"id": "bs1", "name": "Bistatic-1 (Bistatic Receiver)", "lat": 35.1818, "lon": -97.4394, "archiveUrl": "https://radarhub.arrc.ou.edu/archive/bs1/", "wsGroup": "Bistatic-1"},
+        {"id": "px1000", "name": "PX-1000 (Polarimetric X-Band)", "lat": 35.1818, "lon": -97.4394, "wsGroup": "PX-1000"},
+        {"id": "raxpol", "name": "RaXPol (Rapid-Scan Mobile Doppler)", "lat": 35.1818, "lon": -97.4394, "wsGroup": "RaXPol"},
+        {"id": "px10k", "name": "PX-10k (High-Power X-Band)", "lat": 35.1818, "lon": -97.4394, "wsGroup": "PX-10k"},
+        {"id": "dlroof", "name": "Lidar-Roof (ARRC Doppler Lidar)", "lat": 35.1818, "lon": -97.4394, "wsGroup": "Lidar-Roof"},
+        {"id": "bs1", "name": "Bistatic-1 (Bistatic Receiver)", "lat": 35.1818, "lon": -97.4394, "wsGroup": "Bistatic-1"},
     ]
     selected = [u for u in units_meta if not pathway or u["id"] == pathway.lower()]
+    hdrs = {"User-Agent": "Mozilla/5.0", "Accept-Encoding": "gzip, deflate", "Accept": "application/json"}
     out_units = []
     for u in selected:
         data_url = f"https://radarhub.arrc.ou.edu/data/month/{u['id']}/{month}/"
-        reachable = False
-        latest_data = None
+        reachable, month_map, active_days, hourly_counts, latest_sweeps = False, {}, [], [], []
+        latest_day = day if (day and len(day) == 8) else None
         try:
-            r = await http_client.get(data_url, headers={"User-Agent": "Mozilla/5.0", "Referer": u["archiveUrl"]}, timeout=5.0)
+            r = await http_client.get(data_url, headers=hdrs, timeout=5.0)
             if r.status_code == 200:
                 reachable = True
-                try:
-                    latest_data = r.json()
-                except Exception:
-                    latest_data = {"raw_length": len(r.text)}
+                month_map = r.json()
+                active_days = sorted([k for k, v in month_map.items() if int(v or 0) > 0])
+                if not latest_day and active_days:
+                    latest_day = active_days[-1]
+            if latest_day:
+                cr = await http_client.get(f"https://radarhub.arrc.ou.edu/data/count/{u['id']}/{latest_day}/", headers=hdrs, timeout=4.0)
+                if cr.status_code == 200:
+                    hourly_counts = cr.json().get("count", [])
+                    last_hr = next((i for i in range(len(hourly_counts) - 1, -1, -1) if hourly_counts[i] > 0), -1)
+                    if last_hr >= 0:
+                        tr = await http_client.get(f"https://radarhub.arrc.ou.edu/data/table/{u['id']}/{latest_day}-{last_hr:02d}00/", headers=hdrs, timeout=4.0)
+                        if tr.status_code == 200:
+                            latest_sweeps = list(reversed(tr.json().get("items", [])[-24:]))
         except Exception:
             pass
-        out_units.append({**u, "month": month, "dataUrl": data_url, "wsUrl": "wss://radarhub.arrc.ou.edu/ws/user/", "pollIntervalSec": 60, "reachable": reachable, "latestData": latest_data})
-    return {"status": "ok", "source": "OU ARRC RadarHub", "month": month, "poll_interval_sec": 60, "websocket_url": "wss://radarhub.arrc.ou.edu/ws/user/", "count": len(out_units), "units": out_units}
+        out_units.append({**u, "month": month, "dataUrl": data_url, "wsUrl": f"wss://radarhub.arrc.ou.edu/ws/{u['id']}/", "pollIntervalSec": 60, "reachable": reachable, "activeDays": active_days, "monthMap": month_map, "latestDay": latest_day, "hourlyCounts": hourly_counts, "latestSweeps": latest_sweeps})
+    return {"status": "ok", "source": "OU ARRC RadarHub", "month": month, "poll_interval_sec": 60, "count": len(out_units), "units": out_units}
 
 
 @app.get("/api/spotter-reports")
