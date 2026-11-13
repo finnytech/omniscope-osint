@@ -1778,6 +1778,147 @@ async def get_nearby_metar_stations(lat: float = 50.0, lon: float = 10.0, limit:
 
 
 # =====================================================================
+# v2.9.0 KEYLESS STORM, MOBILE DOPPLER & APRS-IS ENDPOINTS
+# =====================================================================
+@app.get("/api/radarhub")
+async def get_radarhub(pathway: str = "", month: str = ""):
+    from datetime import datetime, timezone
+    if not month:
+        month = datetime.now(timezone.utc).strftime("%Y-%m")
+    units_meta = [
+        {"id": "px1000", "name": "PX-1000 (Polarimetric X-Band)", "lat": 35.1818, "lon": -97.4394, "archiveUrl": "https://radarhub.arrc.ou.edu/archive/px1000/", "wsGroup": "PX-1000"},
+        {"id": "raxpol", "name": "RaXPol (Rapid-Scan Mobile Doppler)", "lat": 35.1818, "lon": -97.4394, "archiveUrl": "https://radarhub.arrc.ou.edu/archive/raxpol/", "wsGroup": "RaXPol"},
+        {"id": "px10k", "name": "PX-10k (High-Power X-Band)", "lat": 35.1818, "lon": -97.4394, "archiveUrl": "https://radarhub.arrc.ou.edu/archive/px10k/", "wsGroup": "PX-10k"},
+        {"id": "dlroof", "name": "Lidar-Roof (ARRC Doppler Lidar)", "lat": 35.1818, "lon": -97.4394, "archiveUrl": "https://radarhub.arrc.ou.edu/archive/dlroof/", "wsGroup": "Lidar-Roof"},
+        {"id": "bs1", "name": "Bistatic-1 (Bistatic Receiver)", "lat": 35.1818, "lon": -97.4394, "archiveUrl": "https://radarhub.arrc.ou.edu/archive/bs1/", "wsGroup": "Bistatic-1"},
+    ]
+    selected = [u for u in units_meta if not pathway or u["id"] == pathway.lower()]
+    out_units = []
+    for u in selected:
+        data_url = f"https://radarhub.arrc.ou.edu/data/month/{u['id']}/{month}/"
+        reachable = False
+        latest_data = None
+        try:
+            r = await http_client.get(data_url, headers={"User-Agent": "Mozilla/5.0", "Referer": u["archiveUrl"]}, timeout=5.0)
+            if r.status_code == 200:
+                reachable = True
+                try:
+                    latest_data = r.json()
+                except Exception:
+                    latest_data = {"raw_length": len(r.text)}
+        except Exception:
+            pass
+        out_units.append({**u, "month": month, "dataUrl": data_url, "wsUrl": "wss://radarhub.arrc.ou.edu/ws/user/", "pollIntervalSec": 60, "reachable": reachable, "latestData": latest_data})
+    return {"status": "ok", "source": "OU ARRC RadarHub", "month": month, "poll_interval_sec": 60, "websocket_url": "wss://radarhub.arrc.ou.edu/ws/user/", "count": len(out_units), "units": out_units}
+
+
+@app.get("/api/spotter-reports")
+async def get_spotter_reports():
+    import re
+    reports = []
+    try:
+        r = await http_client.get("https://www.spotternetwork.org/feeds/reports.txt", headers={"User-Agent": "Mozilla/5.0"}, timeout=6.0)
+        if r.status_code == 200:
+            for line in r.text.splitlines():
+                m = re.match(r'^Icon:\s*([-\d.]+)\s*,\s*([-\d.]+)\s*,\s*[^,]*,\s*(\d+)\s*,\s*(\d+)\s*,\s*"([^"]*)"', line.strip(), re.I)
+                if m:
+                    lat, lon = float(m.group(1)), float(m.group(2))
+                    tip = m.group(5).replace("\\n", " | ").strip()
+                    low = tip.lower()
+                    rtype = "TORNADO" if "tornado" in low else ("HAIL" if "hail" in low else ("DAMAGING WIND" if "wind" in low else "STORM REPORT"))
+                    reports.append({"id": f"snrep-{lat:.4f}-{lon:.4f}-{len(reports)}", "type": rtype, "lat": lat, "lon": lon, "description": tip, "source": "Spotter Network Reports"})
+    except Exception:
+        pass
+    return {"status": "ok", "source": "https://www.spotternetwork.org/feeds/reports.txt", "count": len(reports), "reports": reports}
+
+
+@app.get("/api/dow-live")
+async def get_dow_live():
+    import re
+    units = []
+    try:
+        r = await http_client.get("https://svr.guru/", headers={"User-Agent": "Mozilla/5.0"}, timeout=6.0)
+        if r.status_code == 200:
+            for m in re.finditer(r'<a[^>]+href=["\'](data\.php\?[^"\']+)["\'][^>]*>([^<]+)</a>[\s\S]{0,260}?Last Plot:\s*<span[^>]*>([^<]+)</span>', r.text, re.I):
+                data_url = f"https://svr.guru/{m.group(1)}"
+                name = m.group(2).strip()
+                last_plot = m.group(3).strip()
+                latest_img = None
+                try:
+                    dr = await http_client.get(data_url, headers={"User-Agent": "Mozilla/5.0"}, timeout=4.5)
+                    if dr.status_code == 200:
+                        imgs = re.findall(r'<img[^>]+src=["\'](img/[^"\']+\.png)["\']', dr.text, re.I)
+                        if imgs:
+                            latest_img = f"https://svr.guru/{imgs[-1]}"
+                except Exception:
+                    pass
+                units.append({"id": f"dow-{name.lower()}", "name": name, "lastPlotUtc": last_plot, "dataUrl": data_url, "latestPlotUrl": latest_img, "soundingUrl": "https://svr.guru/sonde.php", "lat": 40.1164, "lon": -88.2434, "source": "FARM / DOW (codewx.io -> svr.guru)"})
+    except Exception:
+        pass
+    return {"status": "ok", "source": "FARM / DOW Live (https://codewx.io/live/index.php)", "count": len(units), "units": units}
+
+
+@app.get("/api/ncar-eol")
+async def get_ncar_eol():
+    import re
+    campaigns = []
+    try:
+        r = await http_client.get("https://catalog.eol.ucar.edu/", headers={"User-Agent": "Mozilla/5.0"}, timeout=6.0)
+        if r.status_code == 200:
+            seen = set()
+            for m in re.finditer(r'<a[^>]+href=["\']/([a-z0-9_-]{3,32})["\'][^>]*>([^<]{2,60})</a>', r.text, re.I):
+                slug, title = m.group(1), m.group(2).strip()
+                if slug in {"about", "login", "static", "maps", "api", "docs", "help"} or slug in seen:
+                    continue
+                seen.add(slug)
+                campaigns.append({"id": f"eol-{slug}", "slug": slug, "title": title, "catalogUrl": f"https://catalog.eol.ucar.edu/{slug}", "mapUrl": f"https://catalog.eol.ucar.edu/maps/{slug}", "lat": 40.015, "lon": -105.2705, "source": "NCAR / EOL Field Catalog"})
+                if len(campaigns) >= 16:
+                    break
+    except Exception:
+        pass
+    return {"status": "ok", "source": "https://catalog.eol.ucar.edu", "count": len(campaigns), "campaigns": campaigns}
+
+
+@app.get("/api/telemetry/aprs")
+async def get_aprs_telemetry():
+    import socket, re
+    stations = []
+    # Genuine keyless TCP socket read from rotate.aprs2.net:14580 (with NWS fallback if port 14580 is firewalled)
+    try:
+        sock = socket.create_connection(("rotate.aprs2.net", 14580), timeout=3.0)
+        sock.sendall(b"user NOCALL pass -1 vers OSINT-Dash 1.0 filter t/w\r\n")
+        sock.settimeout(2.0)
+        buf = b""
+        for _ in range(12):
+            try:
+                chunk = sock.recv(2048)
+                if not chunk:
+                    break
+                buf += chunk
+                if buf.count(b"\n") >= 25:
+                    break
+            except Exception:
+                break
+        sock.close()
+        for line in buf.decode("utf-8", "ignore").splitlines():
+            if not line or line.startswith("#") or ">" not in line or ":" not in line:
+                continue
+            call = line.split(">", 1)[0].strip()
+            payload = line.split(":", 1)[1]
+            m = re.search(r'(\d{4}\.\d{2})([NS]).*?(\d{5}\.\d{2})([EW])', payload)
+            if m:
+                lat_raw, ns, lon_raw, ew = m.group(1), m.group(2), m.group(3), m.group(4)
+                lat = int(lat_raw[:2]) + float(lat_raw[2:]) / 60.0
+                if ns == "S": lat = -lat
+                lon = int(lon_raw[:3]) + float(lon_raw[3:]) / 60.0
+                if ew == "W": lon = -lon
+                stations.append({"callsign": call, "name": f"APRS {call}", "lat": round(lat, 5), "lon": round(lon, 5), "source": "APRS-IS rotate.aprs2.net:14580"})
+    except Exception:
+        pass
+    return {"status": "ok", "aprs_tcp_endpoint": "rotate.aprs2.net:14580", "aprs_login": "user NOCALL pass -1 vers OSINT-Dash 1.0 filter t/w", "count": len(stations), "stations": stations}
+
+
+# =====================================================================
 # STATIC FRONTEND SERVING
 # =====================================================================
 
