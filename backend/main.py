@@ -1929,6 +1929,131 @@ async def get_aprs_telemetry():
     return {"status": "ok", "aprs_tcp_endpoint": "rotate.aprs2.net:14580", "aprs_login": "user NOCALL pass -1 vers OSINT-Dash 1.0 filter t/w", "count": len(stations), "stations": stations}
 
 
+@app.get("/api/weather/spc-outlook")
+async def get_spc_outlook(day: str = "1", hazard: str = "cat"):
+    d = day if day in ("1", "2", "3") else "1"
+    h = hazard if hazard in ("cat", "torn", "hail", "wind") else "cat"
+    url = f"https://www.spc.noaa.gov/products/outlook/day{d}otlk_{h}.lyr.geojson"
+    try:
+        r = await http_client.get(url, headers={"User-Agent": "OmniScope-OSINT/2.10"}, timeout=7.0)
+        if r.status_code == 200:
+            gj = r.json()
+            feats = gj.get("features", [])
+            return {"status": "ok", "source": url, "day": d, "hazard": h, "count": len(feats), "features": feats}
+    except Exception:
+        pass
+    return {"status": "ok", "source": url, "day": d, "hazard": h, "count": 0, "features": []}
+
+
+@app.get("/api/weather/lsr")
+async def get_iem_lsr(hours: int = 24):
+    hrs = max(1, min(48, hours))
+    url = f"https://mesonet.agron.iastate.edu/geojson/lsr.geojson?hours={hrs}"
+    reports = []
+    try:
+        r = await http_client.get(url, headers={"User-Agent": "OmniScope-OSINT/2.10"}, timeout=7.0)
+        if r.status_code == 200:
+            for f in r.json().get("features", [])[:400]:
+                p = f.get("properties") or {}
+                c = (f.get("geometry") or {}).get("coordinates") or []
+                if len(c) >= 2:
+                    reports.append({
+                        "lat": float(c[1]), "lon": float(c[0]),
+                        "type": p.get("typetext") or p.get("type") or "STORM REPORT",
+                        "magnitude": p.get("magnitude"), "unit": p.get("unit") or "",
+                        "city": p.get("city") or "", "state": p.get("state") or "",
+                        "wfo": p.get("wfo") or "", "valid": p.get("valid") or "", "remark": p.get("remark") or ""
+                    })
+    except Exception:
+        pass
+    return {"status": "ok", "source": url, "hours": hrs, "count": len(reports), "reports": reports}
+
+
+@app.get("/api/aviation/military")
+async def get_military_flights():
+    for src, url in [("adsb.fi", "https://opendata.adsb.fi/api/v2/mil"), ("adsb.lol", "https://api.adsb.lol/v2/mil")]:
+        try:
+            r = await http_client.get(url, headers={"User-Agent": "Mozilla/5.0", "Accept": "application/json"}, timeout=6.5)
+            if r.status_code == 200:
+                raw = r.json().get("ac") or []
+                ac = [
+                    {
+                        "hex": a.get("hex", ""), "flight": (a.get("flight") or a.get("r") or a.get("hex") or "MIL").strip(),
+                        "reg": a.get("r", ""), "type": a.get("t", ""), "desc": a.get("desc") or a.get("ownOp") or "",
+                        "lat": float(a["lat"]), "lon": float(a["lon"]),
+                        "alt_baro": a.get("alt_baro"), "gs": round(float(a["gs"])) if a.get("gs") is not None else None,
+                        "track": round(float(a.get("track") or 0)), "squawk": a.get("squawk", "")
+                    }
+                    for a in raw if a.get("lat") is not None and a.get("lon") is not None
+                ][:350]
+                return {"status": "ok", "source": src, "count": len(ac), "aircraft": ac}
+        except Exception:
+            pass
+    return {"status": "ok", "source": "adsb-fallback", "count": 0, "aircraft": []}
+
+
+@app.get("/api/cyber/outages")
+async def get_cyber_outages():
+    import time
+    now_s = int(time.time())
+    outages, censorship, botnets, bot_total = [], [], [], 0
+    try:
+        ir = await http_client.get(f"https://api.ioda.inetintel.cc.gatech.edu/v2/outages/alerts?from={now_s-86400}&until={now_s}&limit=25", timeout=6.0)
+        if ir.status_code == 200:
+            for a in (ir.json().get("data") or [])[:25]:
+                ent = a.get("entity") or {}
+                outages.append({"datasource": a.get("datasource", "ioda"), "entityType": ent.get("type", "country"), "entityCode": ent.get("code", ""), "entityName": ent.get("name", ""), "level": a.get("level", "warning"), "time": a.get("time", now_s)})
+    except Exception:
+        pass
+    try:
+        or_ = await http_client.get("https://api.ooni.io/api/v1/measurements?limit=25&anomaly=true", timeout=6.0)
+        if or_.status_code == 200:
+            for m in (or_.json().get("results") or [])[:20]:
+                censorship.append({"cc": m.get("probe_cc", ""), "asn": m.get("probe_asn", ""), "test_name": m.get("test_name", ""), "input": m.get("input", ""), "anomaly": bool(m.get("anomaly")), "confirmed": bool(m.get("confirmed"))})
+    except Exception:
+        pass
+    try:
+        fr = await http_client.get("https://feodotracker.abuse.ch/downloads/ipblocklist_recommended.json", timeout=6.0)
+        if fr.status_code == 200 and isinstance(fr.json(), list):
+            fj = fr.json()
+            bot_total = len(fj)
+            botnets = [{"ip": b.get("ip_address", ""), "port": b.get("port", 0), "malware": b.get("malware", ""), "country": b.get("country", "")} for b in fj[:30]]
+    except Exception:
+        pass
+    return {"status": "ok", "sources": ["Georgia Tech IODA v2", "OONI", "abuse.ch Feodo Tracker"], "outages": outages, "censorship": censorship, "botnets": botnets, "botnet_total": bot_total}
+
+
+@app.get("/api/disasters/eonet")
+async def get_eonet():
+    evs = []
+    try:
+        r = await http_client.get("https://eonet.gsfc.nasa.gov/api/v3/events?status=open&limit=60", headers={"Accept": "application/json"}, timeout=7.0)
+        if r.status_code == 200 and r.text.strip().startswith("{"):
+            for ev in r.json().get("events", []):
+                geoms = ev.get("geometry") or []
+                g = geoms[-1] if geoms else {}
+                c = g.get("coordinates") or []
+                if len(c) >= 2 and isinstance(c[0], (int, float)) and isinstance(c[1], (int, float)):
+                    cats = ev.get("categories") or []
+                    evs.append({"id": ev.get("id"), "title": ev.get("title"), "category": cats[0].get("title") if cats else "Natural Event", "lat": c[1], "lon": c[0], "date": g.get("date", "")})
+    except Exception:
+        pass
+    return {"status": "ok", "source": "NASA EONET v3", "count": len(evs), "events": evs}
+
+
+@app.get("/api/space/satellites")
+async def get_space_satellites(group: str = "weather"):
+    g = group if group in ("weather", "stations", "starlink", "noaa", "goes") else "weather"
+    sats = []
+    try:
+        r = await http_client.get(f"https://celestrak.org/NORAD/elements/gp.php?GROUP={g}&FORMAT=json", timeout=7.0)
+        if r.status_code == 200 and isinstance(r.json(), list):
+            sats = [{"name": s.get("OBJECT_NAME", ""), "norad_id": s.get("NORAD_CAT_ID", 0), "epoch": s.get("EPOCH", ""), "inclination": s.get("INCLINATION", 0), "mean_motion": s.get("MEAN_MOTION", 0)} for s in r.json()[:120]]
+    except Exception:
+        pass
+    return {"status": "ok", "source": "CelesTrak NORAD GP", "group": g, "count": len(sats), "satellites": sats}
+
+
 # =====================================================================
 # STATIC FRONTEND SERVING
 # =====================================================================
