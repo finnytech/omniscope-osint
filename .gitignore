@@ -6,6 +6,11 @@
 *.env
 .env.*
 !.env.example
+.ops_secret*
+.dev.vars
+.dev.vars.*
+*.key
+*.pem
 backend/data/api_keys.json
 backend/data/tomorrow_quota.json
 
